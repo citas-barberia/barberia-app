@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Agendar Cita - Barbería</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Montserrat', sans-serif; }
+body { background: #121212; color: #f0f0f0; }
+.container { max-width: 800px; margin: 40px auto; background: #1f1f1f; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+h1 { text-align: center; font-size: 2.5rem; margin-bottom: 30px; color: #D4AF37; text-shadow: 1px 1px 3px #000; }
+h2 { margin-top: 40px; margin-bottom: 20px; color: #ccc; text-align: center; }
+form { display: flex; flex-direction: column; gap: 20px; }
+input, select, button { padding: 15px; font-size: 16px; border-radius: 10px; border: 1px solid #333; outline: none; transition: all 0.3s ease; }
+input, select { background: #2b2b2b; color: #f0f0f0; }
+input:focus, select:focus { border-color: #D4AF37; box-shadow: 0 0 10px #D4AF37; }
+button { background: #D4AF37; color: #121212; font-weight: bold; cursor: pointer; transition: all 0.3s ease; }
+button:hover { background: #c29d2f; transform: scale(1.03); }
+table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #2b2b2b; border-radius: 10px; overflow: hidden; }
+th, td { padding: 12px; text-align: center; }
+th { background: #333; color: #D4AF37; font-weight: bold; }
+tr:nth-child(even) { background: #262626; }
+tr:nth-child(odd) { background: #2b2b2b; }
+tr:hover { background: #D4AF3733; }
+.btn-whatsapp { background: #25D366; color: #fff; text-decoration: none; padding: 8px 12px; border-radius: 8px; font-weight: bold; transition: all 0.3s ease; }
+.btn-whatsapp:hover { background: #1ebe57; transform: scale(1.05); }
+.alert { padding: 12px; border-radius: 12px; margin-bottom: 20px; text-align: center; font-weight: bold; opacity: 0; animation: fadeIn 0.5s forwards, fadeOut 0.5s 2.5s forwards; }
+.alert-success { background-color: #28a745; color: #fff; }
+.alert-error { background-color: #dc3545; color: #fff; }
+@keyframes fadeIn { to { opacity: 1; } }
+@keyframes fadeOut { to { opacity: 0; } }
+@media (max-width: 768px) {
+    .container { padding: 25px; }
+    h1 { font-size: 2rem; }
+    input, select, button { font-size: 14px; padding: 12px; }
+    table { font-size: 14px; }
+}
+</style>
+<script>
+// Función para actualizar horas disponibles
+async function actualizarHoras() {
+    const fecha = document.getElementById("fecha").value;
+    const barbero = document.getElementById("barbero").value;
+    const selectHora = document.getElementById("hora");
+
+    if(!fecha || !barbero) return;
+
+    // Llamamos a endpoint /horas?fecha=YYYY-MM-DD&barbero=Nombre
+    const res = await fetch(`/horas?fecha=${fecha}&barbero=${barbero}`);
+    const horas = await res.json();
+
+    selectHora.innerHTML = "";
+    if(horas.length === 0){
+        const option = document.createElement("option");
+        option.value = "";
+        option.text = "No hay horas disponibles";
+        selectHora.appendChild(option);
+        return;
+    }
+
+    horas.forEach(h => {
+        const option = document.createElement("option");
+        option.value = h;
+        option.text = h;
+        selectHora.appendChild(option);
+    });
+}
+
+// Fijar fecha 2026 al cargar
+window.addEventListener("DOMContentLoaded", () => {
+    const fechaInput = document.getElementById("fecha");
+    const today = new Date();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    fechaInput.value = `2026-${month}-${day}`;
+    fechaInput.min = "2026-01-01";
+    fechaInput.max = "2026-12-31";
+});
+</script>
+</head>
+<body>
+<div class="container">
+    <h1>Agendar Cita - Barbería</h1>
+
+    <!-- Mensajes flash -->
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for msg in messages %}
+          <div class="alert {% if 'exitosamente' in msg %}alert-success{% else %}alert-error{% endif %}">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Formulario -->
+    <form method="POST">
+        <input type="text" name="cliente" placeholder="Tu nombre" required>
+        <input type="text" name="barbero" id="barbero" placeholder="Nombre del barbero" oninput="actualizarHoras()" required>
+        
+        <select id="servicio" name="servicio" required>
+            <option value="">Seleccione un servicio</option>
+            {% for s, p in servicios.items() %}
+            <option value="{{ s }}">{{ s }} - ₡{{ p }}</option>
+            {% endfor %}
+        </select>
+        
+        <input type="date" id="fecha" name="fecha" onchange="actualizarHoras()" required>
+        <select id="hora" name="hora" required></select>
+        <button type="submit">Agendar Cita</button>
+    </form>
+
+    <!-- Tabla de citas -->
+    <h2>Tus Citas</h2>
+    <table>
+        <tr>
+            <th>Cliente</th><th>Barbero</th><th>Servicio</th><th>Precio</th><th>Fecha</th><th>Hora</th><th>Cancelar</th><th>WhatsApp</th>
+        </tr>
+        {% for c in citas %}
+        <tr>
+            <td>{{ c.cliente }}</td>
+            <td>{{ c.barbero }}</td>
+            <td>{{ c.servicio }}</td>
+            <td>{{ c.precio }}</td>
+            <td>{{ c.fecha.split('-')[2] }}/{{ c.fecha.split('-')[1] }}/{{ c.fecha.split('-')[0] }}</td>
+            <td>{{ c.hora }}</td>
+            <td>
+                {% if c.servicio != "CITA CANCELADA" %}
+                <form method="POST" action="/cancelar">
+                    <input type="hidden" name="id" value="{{ c.id }}">
+                <button type="submit">Cancelar</button>
+                </form>
+                {% endif %}
+            </td>
+            <td>
+                {% if c.servicio != "CITA CANCELADA" %}
+                <a class="btn-whatsapp" href="https://wa.me/50672314147?text=Hola%20{{ c.barbero }},%20necesito%20ayuda%20con%20mi%20cita." target="_blank">WhatsApp</a>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
