@@ -32,7 +32,10 @@ def enviar_whatsapp(mensaje):
         "text": {"body": mensaje}
     }
 
-    requests.post(url, headers=headers, json=data)
+    try:
+        requests.post(url, headers=headers, json=data)
+    except:
+        print("Error enviando WhatsApp")
 
 
 # ===== Leer citas =====
@@ -107,6 +110,7 @@ def index():
 
         citas = leer_citas()
 
+        # Verificar choque de hora
         conflicto = any(
             c["barbero"] == barbero and
             c["fecha"] == fecha and
@@ -121,17 +125,18 @@ def index():
 
         guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
 
-        # ===== WHATSAPP NUEVA CITA =====
+        # ===== MENSAJE WHATSAPP =====
         mensaje = f"""
-📅 NUEVA CITA
+💈 Nueva cita agendada
 
-👤 Cliente: {cliente}
-💈 Barbero: {barbero}
-✂️ Servicio: {servicio}
-📆 Fecha: {fecha}
-⏰ Hora: {hora}
-💰 Precio: ₡{precio}
+Cliente: {cliente}
+Barbero: {barbero}
+Servicio: {servicio}
+Fecha: {fecha}
+Hora: {hora}
+Precio: ₡{precio}
 """
+
         enviar_whatsapp(mensaje)
 
         flash("Cita agendada exitosamente")
@@ -169,20 +174,7 @@ def cancelar():
     cita = next((c for c in citas if c["id"] == id_cita and c["cliente_id"] == cliente_id), None)
 
     if cita:
-
         cancelar_cita(id_cita)
-
-        # ===== WHATSAPP CANCELACION =====
-        mensaje = f"""
-❌ CITA CANCELADA
-
-👤 Cliente: {cita['cliente']}
-💈 Barbero: {cita['barbero']}
-📆 Fecha: {cita['fecha']}
-⏰ Hora: {cita['hora']}
-"""
-        enviar_whatsapp(mensaje)
-
         flash("Cita cancelada")
 
     return redirect(url_for("index", cliente_id=cliente_id))
