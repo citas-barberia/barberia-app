@@ -4,32 +4,10 @@ from datetime import date
 import requests
 
 app = Flask(__name__)
-from flask import request
-
-VERIFY_TOKEN = "mi_token"
-
-
-@app.route("/webhook", methods=["GET", "POST"])
-def webhook():
-
-    # ----- VERIFICACIÓN META -----
-    if request.method == "GET":
-        token = request.args.get("hub.verify_token")
-        challenge = request.args.get("hub.challenge")
-
-        if token == VERIFY_TOKEN:
-            return challenge
-        else:
-            return "Token incorrecto", 403
-
-    # ----- MENSAJES QUE LLEGAN -----
-    if request.method == "POST":
-        data = request.get_json()
-        print("Mensaje recibido:", data)
-        return "ok", 200
-
 app.secret_key = "secret_key"
 
+# ===== CONFIG =====
+VERIFY_TOKEN = "mi_token"
 NUMERO_BARBERO = "50672314147"
 DOMINIO = "https://barberia-app-1.onrender.com"
 
@@ -47,7 +25,7 @@ def enviar_whatsapp(mensaje):
     url = "https://graph.facebook.com/v22.0/994974633695883/messages"
 
     headers = {
-        "Authorization": "Bearer EAAMIUG0X8IgBQoC5PZBZCcY1QFKmLaSBNjAdH7XDB2BALMfGr8nfIbeatbHNjKZB1ZAZA0lkTa5HGQQw1GYZAZAFjKqsaCeDGPRlZAcynZAnHkZAKqjMeVlNo16XDYx0uCztLEYp94L547Igs7q4e4J3EKdCvoxeUmVxyS5ZAxf2N4ZAajlVLZABuPgoS34ZAaIQzNCZAvpJUd0qQZCuJd6BM5okrZAn9opX6fM4d6S5xeTQX3oVWA7I5SnVkfpcobhvZB4GpdCsaN1gOYIeSUx0jvs4YEatgj",
+        "Authorization": "Bearer TU_TOKEN_AQUI",
         "Content-Type": "application/json"
     }
 
@@ -67,7 +45,7 @@ def enviar_whatsapp_respuesta(numero, mensaje):
     url = "https://graph.facebook.com/v22.0/994974633695883/messages"
 
     headers = {
-        "Authorization": "Bearer EAAMIUG0X8IgBQoC5PZBZCcY1QFKmLaSBNjAdH7XDB2BALMfGr8nfIbeatbHNjKZB1ZAZA0lkTa5HGQQw1GYZAZAFjKqsaCeDGPRlZAcynZAnHkZAKqjMeVlNo16XDYx0uCztLEYp94L547Igs7q4e4J3EKdCvoxeUmVxyS5ZAxf2N4ZAajlVLZABuPgoS34ZAaIQzNCZAvpJUd0qQZCuJd6BM5okrZAn9opX6fM4d6S5xeTQX3oVWA7I5SnVkfpcobhvZB4GpdCsaN1gOYIeSUx0jvs4YEatgj",
+        "Authorization": "Bearer TU_TOKEN_AQUI",
         "Content-Type": "application/json"
     }
 
@@ -85,18 +63,22 @@ def enviar_whatsapp_respuesta(numero, mensaje):
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook():
 
+    # ----- VERIFICACIÓN META -----
     if request.method == "GET":
-        verify_token = "mi_token"
 
         token = request.args.get("hub.verify_token")
         challenge = request.args.get("hub.challenge")
 
-        if token == verify_token:
+        if token == VERIFY_TOKEN:
             return challenge
-        return "Error", 403
+        else:
+            return "Token incorrecto", 403
 
+
+    # ----- MENSAJES QUE LLEGAN -----
     if request.method == "POST":
-        data = request.json
+
+        data = request.get_json()
 
         try:
             numero = data["entry"][0]["changes"][0]["value"]["messages"][0]["from"]
@@ -111,18 +93,22 @@ Puede agendar su cita aquí:
 
             enviar_whatsapp_respuesta(numero, mensaje)
 
-        except:
-            pass
+        except Exception as e:
+            print("Error webhook:", e)
 
         return "ok", 200
 
 
 # ===== Leer citas =====
 def leer_citas():
+
     citas = []
+
     try:
         with open("citas.txt", "r", encoding="utf-8") as f:
+
             for linea in f:
+
                 if linea.strip() == "":
                     continue
 
@@ -143,24 +129,29 @@ def leer_citas():
                     "fecha": fecha,
                     "hora": hora
                 })
+
     except FileNotFoundError:
         pass
 
     return citas
 
 
-# ===== Guardar =====
+# ===== Guardar cita =====
 def guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora):
+
     with open("citas.txt", "a", encoding="utf-8") as f:
         f.write(f"{id_cita}|{cliente}|{cliente_id}|{barbero}|{servicio}|{precio}|{fecha}|{hora}\n")
 
 
-# ===== Cancelar =====
+# ===== Cancelar cita =====
 def cancelar_cita(id_cita):
+
     citas = leer_citas()
 
     with open("citas.txt", "w", encoding="utf-8") as f:
+
         for c in citas:
+
             if c["id"] == id_cita:
                 c["servicio"] = "CITA CANCELADA"
 
@@ -225,7 +216,7 @@ Precio: ₡{precio}
     return render_template("index.html", servicios=servicios, citas=citas)
 
 
-# ===== VER CITA PRIVADA =====
+# ===== VER CITA =====
 @app.route("/cita/<id_cita>")
 def ver_cita(id_cita):
 
@@ -248,6 +239,7 @@ def cancelar():
     cliente_id = request.args.get("cliente_id")
 
     citas = leer_citas()
+
     cita = next((c for c in citas if c["id"] == id_cita and c["cliente_id"] == cliente_id), None)
 
     if cita:
@@ -257,7 +249,7 @@ def cancelar():
     return redirect(url_for("index", cliente_id=cliente_id))
 
 
-# ===== HORAS =====
+# ===== HORAS DISPONIBLES =====
 @app.route("/horas")
 def horas():
 
@@ -282,6 +274,7 @@ def barbero():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
