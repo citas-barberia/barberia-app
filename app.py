@@ -4,6 +4,30 @@ from datetime import date
 import requests
 
 app = Flask(__name__)
+from flask import request
+
+VERIFY_TOKEN = "mi_token"
+
+
+@app.route("/webhook", methods=["GET", "POST"])
+def webhook():
+
+    # ----- VERIFICACIÓN META -----
+    if request.method == "GET":
+        token = request.args.get("hub.verify_token")
+        challenge = request.args.get("hub.challenge")
+
+        if token == VERIFY_TOKEN:
+            return challenge
+        else:
+            return "Token incorrecto", 403
+
+    # ----- MENSAJES QUE LLEGAN -----
+    if request.method == "POST":
+        data = request.get_json()
+        print("Mensaje recibido:", data)
+        return "ok", 200
+
 app.secret_key = "secret_key"
 
 NUMERO_BARBERO = "50672314147"
@@ -23,7 +47,7 @@ def enviar_whatsapp(mensaje):
     url = "https://graph.facebook.com/v22.0/994974633695883/messages"
 
     headers = {
-        "Authorization": "Bearer TU_TOKEN_AQUI",
+        "Authorization": "Bearer EAAMIUG0X8IgBQoC5PZBZCcY1QFKmLaSBNjAdH7XDB2BALMfGr8nfIbeatbHNjKZB1ZAZA0lkTa5HGQQw1GYZAZAFjKqsaCeDGPRlZAcynZAnHkZAKqjMeVlNo16XDYx0uCztLEYp94L547Igs7q4e4J3EKdCvoxeUmVxyS5ZAxf2N4ZAajlVLZABuPgoS34ZAaIQzNCZAvpJUd0qQZCuJd6BM5okrZAn9opX6fM4d6S5xeTQX3oVWA7I5SnVkfpcobhvZB4GpdCsaN1gOYIeSUx0jvs4YEatgj",
         "Content-Type": "application/json"
     }
 
@@ -43,7 +67,7 @@ def enviar_whatsapp_respuesta(numero, mensaje):
     url = "https://graph.facebook.com/v22.0/994974633695883/messages"
 
     headers = {
-        "Authorization": "Bearer TU_TOKEN_AQUI",
+        "Authorization": "Bearer EAAMIUG0X8IgBQoC5PZBZCcY1QFKmLaSBNjAdH7XDB2BALMfGr8nfIbeatbHNjKZB1ZAZA0lkTa5HGQQw1GYZAZAFjKqsaCeDGPRlZAcynZAnHkZAKqjMeVlNo16XDYx0uCztLEYp94L547Igs7q4e4J3EKdCvoxeUmVxyS5ZAxf2N4ZAajlVLZABuPgoS34ZAaIQzNCZAvpJUd0qQZCuJd6BM5okrZAn9opX6fM4d6S5xeTQX3oVWA7I5SnVkfpcobhvZB4GpdCsaN1gOYIeSUx0jvs4YEatgj",
         "Content-Type": "application/json"
     }
 
