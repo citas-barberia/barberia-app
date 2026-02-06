@@ -19,8 +19,9 @@ servicios = {
 # ===== WhatsApp =====
 def enviar_whatsapp(mensaje):
     url = "https://graph.facebook.com/v22.0/994974633695883/messages"
+
     headers = {
-        "Authorization": "Bearer TU_TOKEN_AQUI",
+        "Authorization": "Bearer EAAMIUG0X8IgBQoayf9T96izlZCcWLnmDiaBIM3fr8r8RhOkjaTFKpLqHXiWAjb7CbalQC5GaP8BXtDc4YZCyace0nXUm9gMxLbtjYYOpChFcPbZAXzZBHFcmKNeQ7bsZBKYJphbOnBb8GtQFq21mgq1aDneFt9mUNoR27AKZCTH0yjc9wfYqwoebm2ps3zvSFBZAFQMCxsl5IIg8JE1OUZAJtGlXAnT6jUgtWha9XyZBF3oTTIhDbSCDL7CxjZBaYBPHsap07RGsG8IOJiI883En4v",
         "Content-Type": "application/json"
     }
 
@@ -106,7 +107,6 @@ def index():
 
         citas = leer_citas()
 
-        # 🔥 Verificar choque de hora
         conflicto = any(
             c["barbero"] == barbero and
             c["fecha"] == fecha and
@@ -121,11 +121,23 @@ def index():
 
         guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
 
+        # ===== WHATSAPP NUEVA CITA =====
+        mensaje = f"""
+📅 NUEVA CITA
+
+👤 Cliente: {cliente}
+💈 Barbero: {barbero}
+✂️ Servicio: {servicio}
+📆 Fecha: {fecha}
+⏰ Hora: {hora}
+💰 Precio: ₡{precio}
+"""
+        enviar_whatsapp(mensaje)
+
         flash("Cita agendada exitosamente")
 
         return redirect(url_for("ver_cita", id_cita=id_cita, cliente_id=cliente_id))
 
-    # 🔥 Mostrar solo citas privadas
     citas = [c for c in leer_citas() if c["cliente_id"] == cliente_id]
 
     return render_template("index.html", servicios=servicios, citas=citas)
@@ -157,7 +169,20 @@ def cancelar():
     cita = next((c for c in citas if c["id"] == id_cita and c["cliente_id"] == cliente_id), None)
 
     if cita:
+
         cancelar_cita(id_cita)
+
+        # ===== WHATSAPP CANCELACION =====
+        mensaje = f"""
+❌ CITA CANCELADA
+
+👤 Cliente: {cita['cliente']}
+💈 Barbero: {cita['barbero']}
+📆 Fecha: {cita['fecha']}
+⏰ Hora: {cita['hora']}
+"""
+        enviar_whatsapp(mensaje)
+
         flash("Cita cancelada")
 
     return redirect(url_for("index", cliente_id=cliente_id))
@@ -184,6 +209,7 @@ def horas():
 @app.route("/barbero")
 def barbero():
     return render_template("barbero.html", citas=leer_citas(), fecha_actual=date.today())
+
 
 
 

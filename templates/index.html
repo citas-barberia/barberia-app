@@ -132,7 +132,10 @@ window.addEventListener("DOMContentLoaded", () => {
             </td>
             <td>
                 {% if c.servicio != "CITA CANCELADA" %}
-                <a class="btn-whatsapp" href="https://wa.me/50672314147?text=Hola%20{{ c.barbero }},%20necesito%20ayuda%20con%20mi%20cita." target="_blank">WhatsApp</a>
+                <a class="btn-whatsapp" <a href="https://wa.me/50672314147" target="_blank">
+    Enviar por WhatsApp
+</a>
+
                 {% endif %}
             </td>
         </tr>
