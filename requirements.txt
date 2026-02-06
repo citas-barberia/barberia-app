@@ -1,3 +1,8 @@
+<<<<<<< HEAD
 flask
 requests
 gunicorn
+=======
+Flask==3.0.0
+gunicorn==21.2.0
+>>>>>>> fc95a033753445eab450cfaba2e193b67f69b9d5
