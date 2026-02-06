@@ -6,11 +6,8 @@ import requests
 app = Flask(__name__)
 app.secret_key = "secret_key"
 
-# ===== CONFIG =====
 NUMERO_BARBERO = "50672314147"
-TOKEN_WHATSAPP = "EAAMIUG0X8IgBQkkx2iQULg5p5LuepS6CnjWK3mFrp8MONsnIjzinOfOx1ZBBmfh1vow0knXHYS5ZAoBKgfLVLUYxfr6cy91L0eEgxJ8wPJoX7RuaoFb1jixbT9BsEh75dwjxsMuDAeBNIOLxM4wJZAE90whsfbYUQyZA5CZCGfWv9vdY3ZBChJQvHFcirfr4lSmvxWrXqoZCVR8jzOxsrF6qPQqKEDBJ0WHpZAmwySUrsGVwzyFYXmR6wBOAuAZBeB0QFo51wKGcIHZCLkuKSX2CZBw"
-PHONE_ID = "994974633695883"
-DOMINIO = "https://TU_DOMINIO_AQUI"
+DOMINIO = "https://barberia-app-1.onrender.com"
 
 # ===== Servicios =====
 servicios = {
@@ -20,13 +17,13 @@ servicios = {
     "Solo cejas": 2000
 }
 
-# ===== Enviar WhatsApp al BARBERO =====
-def enviar_whatsapp_barbero(mensaje):
+# ===== Enviar mensaje al barbero =====
+def enviar_whatsapp(mensaje):
 
-    url = f"https://graph.facebook.com/v22.0/{PHONE_ID}/messages"
+    url = "https://graph.facebook.com/v22.0/994974633695883/messages"
 
     headers = {
-        "Authorization": f"Bearer {TOKEN_WHATSAPP}",
+        "Authorization": "Bearer TU_TOKEN_AQUI",
         "Content-Type": "application/json"
     }
 
@@ -40,13 +37,13 @@ def enviar_whatsapp_barbero(mensaje):
     requests.post(url, headers=headers, json=data)
 
 
-# ===== Enviar WhatsApp al CLIENTE =====
-def enviar_mensaje_cliente(numero, mensaje):
+# ===== Responder cliente =====
+def enviar_whatsapp_respuesta(numero, mensaje):
 
-    url = f"https://graph.facebook.com/v22.0/{PHONE_ID}/messages"
+    url = "https://graph.facebook.com/v22.0/994974633695883/messages"
 
     headers = {
-        "Authorization": f"Bearer {TOKEN_WHATSAPP}",
+        "Authorization": "Bearer TU_TOKEN_AQUI",
         "Content-Type": "application/json"
     }
 
@@ -64,9 +61,7 @@ def enviar_mensaje_cliente(numero, mensaje):
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook():
 
-    # Verificación Meta
     if request.method == "GET":
-
         verify_token = "mi_token"
 
         token = request.args.get("hub.verify_token")
@@ -74,43 +69,36 @@ def webhook():
 
         if token == verify_token:
             return challenge
-        return "Error"
+        return "Error", 403
 
-    # Recibir mensaje
-    data = request.get_json()
+    if request.method == "POST":
+        data = request.json
 
-    try:
-        numero_cliente = data["entry"][0]["changes"][0]["value"]["messages"][0]["from"]
+        try:
+            numero = data["entry"][0]["changes"][0]["value"]["messages"][0]["from"]
 
-        link = f"{DOMINIO}/?cliente_id={numero_cliente}"
+            link = f"{DOMINIO}/?cliente_id={numero}"
 
-        mensaje = f"""
-Hola 👋 Bienvenido a Barbería José 💈
+            mensaje = f"""Hola 👋 Bienvenido a Barbería José 💈
 
-Será un gusto atenderte.
-
-Puedes agendar tu cita aquí:
+Puede agendar su cita aquí:
 {link}
 """
 
-        enviar_mensaje_cliente(numero_cliente, mensaje)
+            enviar_whatsapp_respuesta(numero, mensaje)
 
-    except:
-        pass
+        except:
+            pass
 
-    return "ok"
+        return "ok", 200
 
 
 # ===== Leer citas =====
 def leer_citas():
-
     citas = []
-
     try:
         with open("citas.txt", "r", encoding="utf-8") as f:
-
             for linea in f:
-
                 if linea.strip() == "":
                     continue
 
@@ -131,30 +119,24 @@ def leer_citas():
                     "fecha": fecha,
                     "hora": hora
                 })
-
     except FileNotFoundError:
         pass
 
     return citas
 
 
-# ===== Guardar cita =====
+# ===== Guardar =====
 def guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora):
-
     with open("citas.txt", "a", encoding="utf-8") as f:
-
         f.write(f"{id_cita}|{cliente}|{cliente_id}|{barbero}|{servicio}|{precio}|{fecha}|{hora}\n")
 
 
-# ===== Cancelar cita =====
+# ===== Cancelar =====
 def cancelar_cita(id_cita):
-
     citas = leer_citas()
 
     with open("citas.txt", "w", encoding="utf-8") as f:
-
         for c in citas:
-
             if c["id"] == id_cita:
                 c["servicio"] = "CITA CANCELADA"
 
@@ -168,7 +150,7 @@ def index():
     cliente_id = request.args.get("cliente_id")
 
     if not cliente_id:
-        return "Acceso inválido"
+        cliente_id = str(uuid.uuid4())
 
     if request.method == "POST":
 
@@ -197,21 +179,18 @@ def index():
 
         guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
 
-        # MENSAJE BARBERO
         mensaje = f"""
-💈 NUEVA CITA
+💈 Nueva cita agendada
 
-👤 Cliente: {cliente}
-✂️ Barbero: {barbero}
-🧾 Servicio: {servicio}
-
-📅 Fecha: {fecha}
-⏰ Hora: {hora}
-
-💰 Total: ₡{precio}
+Cliente: {cliente}
+Barbero: {barbero}
+Servicio: {servicio}
+Fecha: {fecha}
+Hora: {hora}
+Precio: ₡{precio}
 """
 
-        enviar_whatsapp_barbero(mensaje)
+        enviar_whatsapp(mensaje)
 
         flash("Cita agendada exitosamente")
 
@@ -279,6 +258,7 @@ def barbero():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
