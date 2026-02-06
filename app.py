@@ -23,13 +23,16 @@ def enviar_whatsapp(mensaje):
         "Authorization": "Bearer TU_TOKEN_AQUI",
         "Content-Type": "application/json"
     }
+
     data = {
         "messaging_product": "whatsapp",
         "to": NUMERO_BARBERO,
         "type": "text",
         "text": {"body": mensaje}
     }
+
     requests.post(url, headers=headers, json=data)
+
 
 # ===== Leer citas =====
 def leer_citas():
@@ -37,13 +40,20 @@ def leer_citas():
     try:
         with open("citas.txt", "r", encoding="utf-8") as f:
             for linea in f:
-                partes = linea.strip().split("|")
-                if len(partes) != 7:
+                if linea.strip() == "":
                     continue
-                id_cita, cliente, barbero, servicio, precio, fecha, hora = partes
+
+                partes = linea.strip().split("|")
+
+                if len(partes) != 8:
+                    continue
+
+                id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora = partes
+
                 citas.append({
                     "id": id_cita,
                     "cliente": cliente,
+                    "cliente_id": cliente_id,
                     "barbero": barbero,
                     "servicio": servicio,
                     "precio": precio,
@@ -52,80 +62,111 @@ def leer_citas():
                 })
     except FileNotFoundError:
         pass
+
     return citas
 
+
 # ===== Guardar =====
-def guardar_cita(c):
+def guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora):
     with open("citas.txt", "a", encoding="utf-8") as f:
-        f.write(f"{c['id']}|{c['cliente']}|{c['barbero']}|{c['servicio']}|{c['precio']}|{c['fecha']}|{c['hora']}\n")
+        f.write(f"{id_cita}|{cliente}|{cliente_id}|{barbero}|{servicio}|{precio}|{fecha}|{hora}\n")
+
 
 # ===== Cancelar =====
 def cancelar_cita(id_cita):
     citas = leer_citas()
+
     with open("citas.txt", "w", encoding="utf-8") as f:
         for c in citas:
             if c["id"] == id_cita:
                 c["servicio"] = "CITA CANCELADA"
-            f.write(f"{c['id']}|{c['cliente']}|{c['barbero']}|{c['servicio']}|{c['precio']}|{c['fecha']}|{c['hora']}\n")
 
-# ===== INDEX (AGENDAR) =====
+            f.write(f"{c['id']}|{c['cliente']}|{c['cliente_id']}|{c['barbero']}|{c['servicio']}|{c['precio']}|{c['fecha']}|{c['hora']}\n")
+
+
+# ===== INDEX =====
 @app.route("/", methods=["GET", "POST"])
 def index():
+
+    cliente_id = request.args.get("cliente_id")
+
+    if not cliente_id:
+        cliente_id = str(uuid.uuid4())
+
     if request.method == "POST":
+
         cliente = request.form["cliente"]
         barbero = request.form["barbero"]
         servicio = request.form["servicio"]
         fecha = request.form["fecha"]
         hora = request.form["hora"]
+
         precio = str(servicios[servicio])
-
-        citas = leer_citas()
-        if any(c["barbero"] == barbero and c["fecha"] == fecha and c["hora"] == hora and c["servicio"] != "CITA CANCELADA" for c in citas):
-            flash("Hora no disponible")
-            return redirect(url_for("index"))
-
         id_cita = str(uuid.uuid4())
 
-        cita = {
-            "id": id_cita,
-            "cliente": cliente,
-            "barbero": barbero,
-            "servicio": servicio,
-            "precio": precio,
-            "fecha": fecha,
-            "hora": hora
-        }
+        citas = leer_citas()
 
-        guardar_cita(cita)
-
-        enviar_whatsapp(
-            f"📅 NUEVA CITA\n\nCliente: {cliente}\nBarbero: {barbero}\nFecha: {fecha}\nHora: {hora}"
+        # 🔥 Verificar choque de hora
+        conflicto = any(
+            c["barbero"] == barbero and
+            c["fecha"] == fecha and
+            c["hora"] == hora and
+            c["servicio"] != "CITA CANCELADA"
+            for c in citas
         )
 
-        return redirect(url_for("ver_cita", id_cita=id_cita))
+        if conflicto:
+            flash("La hora ya está ocupada")
+            return redirect(url_for("index", cliente_id=cliente_id))
 
-    return render_template("index.html", servicios=servicios, citas=[])
+        guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
 
-# ===== CITA PRIVADA =====
+        flash("Cita agendada exitosamente")
+
+        return redirect(url_for("ver_cita", id_cita=id_cita, cliente_id=cliente_id))
+
+    # 🔥 Mostrar solo citas privadas
+    citas = [c for c in leer_citas() if c["cliente_id"] == cliente_id]
+
+    return render_template("index.html", servicios=servicios, citas=citas)
+
+
+# ===== VER CITA PRIVADA =====
 @app.route("/cita/<id_cita>")
 def ver_cita(id_cita):
+
+    cliente_id = request.args.get("cliente_id")
     citas = leer_citas()
-    cita = next((c for c in citas if c["id"] == id_cita), None)
+
+    cita = next((c for c in citas if c["id"] == id_cita and c["cliente_id"] == cliente_id), None)
+
     if not cita:
         return "Cita no encontrada", 404
+
     return render_template("index.html", servicios=servicios, citas=[cita])
+
 
 # ===== CANCELAR =====
 @app.route("/cancelar", methods=["POST"])
 def cancelar():
+
     id_cita = request.form["id"]
-    cancelar_cita(id_cita)
-    flash("Cita cancelada")
-    return redirect(url_for("index"))
+    cliente_id = request.args.get("cliente_id")
+
+    citas = leer_citas()
+    cita = next((c for c in citas if c["id"] == id_cita and c["cliente_id"] == cliente_id), None)
+
+    if cita:
+        cancelar_cita(id_cita)
+        flash("Cita cancelada")
+
+    return redirect(url_for("index", cliente_id=cliente_id))
+
 
 # ===== HORAS =====
 @app.route("/horas")
 def horas():
+
     fecha = request.args.get("fecha")
     barbero = request.args.get("barbero")
 
@@ -138,9 +179,11 @@ def horas():
 
     return jsonify([h for h in horas if h not in ocupadas])
 
-# ===== BARBERO =====
+
+# ===== PANEL BARBERO =====
 @app.route("/barbero")
 def barbero():
     return render_template("barbero.html", citas=leer_citas(), fecha_actual=date.today())
+
 
 
