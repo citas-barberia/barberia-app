@@ -34,12 +34,10 @@ def enviar_whatsapp(mensaje):
         return
 
     url = f"https://graph.facebook.com/v22.0/{PHONE_NUMBER_ID}/messages"
-
     headers = {
         "Authorization": f"Bearer {WHATSAPP_TOKEN}",
         "Content-Type": "application/json"
     }
-
     data = {
         "messaging_product": "whatsapp",
         "to": NUMERO_BARBERO,
@@ -48,7 +46,9 @@ def enviar_whatsapp(mensaje):
     }
 
     try:
-        requests.post(url, headers=headers, json=data, timeout=15)
+        r = requests.post(url, headers=headers, json=data, timeout=15)
+        if r.status_code >= 400:
+            print("Error WhatsApp barbero:", r.status_code, r.text)
     except Exception as e:
         print("Error enviando WhatsApp al barbero:", e)
 
@@ -60,12 +60,10 @@ def enviar_whatsapp_respuesta(numero, mensaje):
         return
 
     url = f"https://graph.facebook.com/v22.0/{PHONE_NUMBER_ID}/messages"
-
     headers = {
         "Authorization": f"Bearer {WHATSAPP_TOKEN}",
         "Content-Type": "application/json"
     }
-
     data = {
         "messaging_product": "whatsapp",
         "to": numero,
@@ -74,7 +72,9 @@ def enviar_whatsapp_respuesta(numero, mensaje):
     }
 
     try:
-        requests.post(url, headers=headers, json=data, timeout=15)
+        r = requests.post(url, headers=headers, json=data, timeout=15)
+        if r.status_code >= 400:
+            print("Error WhatsApp cliente:", r.status_code, r.text)
     except Exception as e:
         print("Error enviando WhatsApp al cliente:", e)
 
@@ -84,7 +84,6 @@ def enviar_whatsapp_respuesta(numero, mensaje):
 def webhook():
 
     if request.method == "GET":
-
         token = request.args.get("hub.verify_token")
         challenge = request.args.get("hub.challenge")
 
@@ -92,14 +91,11 @@ def webhook():
             return challenge
         return "Token incorrecto", 403
 
-
     if request.method == "POST":
-
         data = request.get_json()
 
         try:
             numero = data["entry"][0]["changes"][0]["value"]["messages"][0]["from"]
-
             link = f"{DOMINIO}/?cliente_id={numero}"
 
             mensaje = f"""Hola 👋 Bienvenido a Barbería José 💈
@@ -107,7 +103,6 @@ def webhook():
 Puede agendar su cita aquí:
 {link}
 """
-
             enviar_whatsapp_respuesta(numero, mensaje)
 
         except Exception as e:
@@ -119,16 +114,13 @@ Puede agendar su cita aquí:
 # ===== Leer citas =====
 def leer_citas():
     citas = []
-
     try:
         with open("citas.txt", "r", encoding="utf-8") as f:
             for linea in f:
-
                 if linea.strip() == "":
                     continue
 
                 partes = linea.strip().split("|")
-
                 if len(partes) != 8:
                     continue
 
@@ -152,19 +144,16 @@ def leer_citas():
 
 # ===== HORAS DISPONIBLES SEGUN FECHA Y BARBERO =====
 def horas_disponibles(fecha, barbero):
-
     ocupadas = [
         c["hora"] for c in leer_citas()
         if c["fecha"] == fecha and c["barbero"] == barbero
     ]
-
     return [h for h in HORAS if h not in ocupadas]
 
 
 # ===== API HORAS DISPONIBLES =====
 @app.route("/horas")
 def obtener_horas():
-
     fecha = request.args.get("fecha")
     barbero = request.args.get("barbero")
 
@@ -172,7 +161,6 @@ def obtener_horas():
         return jsonify([])
 
     horas = horas_disponibles(fecha, barbero)
-
     return jsonify(horas)
 
 
@@ -194,6 +182,7 @@ def eliminar_cita(id_cita):
 
 # ===== CANCELAR CITA =====
 @app.route("/cancelar", methods=["POST"])
+@app.route("/cancelar/", methods=["POST"])
 def cancelar():
 
     id_cita = request.form.get("id")
@@ -235,7 +224,6 @@ Hora: {cita['hora']}
 def index():
 
     cliente_id = request.args.get("cliente_id")
-
     if not cliente_id:
         cliente_id = str(uuid.uuid4())
 
@@ -247,7 +235,6 @@ def index():
         fecha = request.form["fecha"]
         hora = request.form["hora"]
 
-        # Validación: evitar agendar si no hay hora elegida
         if not hora:
             flash("Seleccione una hora disponible")
             return redirect(url_for("index", cliente_id=cliente_id))
@@ -267,15 +254,12 @@ Fecha: {fecha}
 Hora: {hora}
 Precio: ₡{precio}
 """
-
         enviar_whatsapp(mensaje)
 
         flash("Cita agendada exitosamente")
-
         return redirect(url_for("ver_cita", id_cita=id_cita, cliente_id=cliente_id))
 
     citas = [c for c in leer_citas() if c["cliente_id"] == cliente_id]
-
     return render_template("index.html", servicios=servicios, citas=citas, horas=HORAS)
 
 
@@ -284,11 +268,9 @@ Precio: ₡{precio}
 def ver_cita(id_cita):
 
     cliente_id = request.args.get("cliente_id")
-
     citas = leer_citas()
 
     cita = next((c for c in citas if c["id"] == id_cita and c["cliente_id"] == cliente_id), None)
-
     if not cita:
         return "Cita no encontrada", 404
 
@@ -303,6 +285,7 @@ def barbero():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
