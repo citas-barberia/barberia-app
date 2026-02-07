@@ -29,6 +29,9 @@ HORAS = ["09:00am", "10:00am", "11:00am", "1:00pm", "2:00pm", "3:00pm", "4:00pm"
 
 # ===== Enviar mensaje al barbero =====
 def enviar_whatsapp(mensaje):
+    if not WHATSAPP_TOKEN or not PHONE_NUMBER_ID:
+        print("Faltan variables de entorno: WHATSAPP_TOKEN o PHONE_NUMBER_ID")
+        return
 
     url = f"https://graph.facebook.com/v22.0/{PHONE_NUMBER_ID}/messages"
 
@@ -44,11 +47,17 @@ def enviar_whatsapp(mensaje):
         "text": {"body": mensaje}
     }
 
-    requests.post(url, headers=headers, json=data)
+    try:
+        requests.post(url, headers=headers, json=data, timeout=15)
+    except Exception as e:
+        print("Error enviando WhatsApp al barbero:", e)
 
 
 # ===== Responder cliente =====
 def enviar_whatsapp_respuesta(numero, mensaje):
+    if not WHATSAPP_TOKEN or not PHONE_NUMBER_ID:
+        print("Faltan variables de entorno: WHATSAPP_TOKEN o PHONE_NUMBER_ID")
+        return
 
     url = f"https://graph.facebook.com/v22.0/{PHONE_NUMBER_ID}/messages"
 
@@ -64,7 +73,10 @@ def enviar_whatsapp_respuesta(numero, mensaje):
         "text": {"body": mensaje}
     }
 
-    requests.post(url, headers=headers, json=data)
+    try:
+        requests.post(url, headers=headers, json=data, timeout=15)
+    except Exception as e:
+        print("Error enviando WhatsApp al cliente:", e)
 
 
 # ===== WEBHOOK =====
@@ -170,6 +182,54 @@ def guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha,
         f.write(f"{id_cita}|{cliente}|{cliente_id}|{barbero}|{servicio}|{precio}|{fecha}|{hora}\n")
 
 
+# ===== Eliminar cita por ID (para cancelar) =====
+def eliminar_cita(id_cita):
+    citas = leer_citas()
+    nuevas = [c for c in citas if c["id"] != id_cita]
+
+    with open("citas.txt", "w", encoding="utf-8") as f:
+        for c in nuevas:
+            f.write(f"{c['id']}|{c['cliente']}|{c['cliente_id']}|{c['barbero']}|{c['servicio']}|{c['precio']}|{c['fecha']}|{c['hora']}\n")
+
+
+# ===== CANCELAR CITA =====
+@app.route("/cancelar", methods=["POST"])
+def cancelar():
+
+    id_cita = request.form.get("id")
+
+    if not id_cita:
+        flash("Error: no se recibió el ID de la cita")
+        return redirect(url_for("index"))
+
+    citas = leer_citas()
+    cita = next((c for c in citas if c["id"] == id_cita), None)
+
+    if not cita:
+        flash("No se encontró la cita")
+        return redirect(url_for("index"))
+
+    # 1) eliminar del archivo
+    eliminar_cita(id_cita)
+
+    # 2) avisar al barbero por WhatsApp
+    mensaje = f"""
+❌ Cita CANCELADA
+
+Cliente: {cita['cliente']}
+Barbero: {cita['barbero']}
+Servicio: {cita['servicio']}
+Fecha: {cita['fecha']}
+Hora: {cita['hora']}
+"""
+    enviar_whatsapp(mensaje)
+
+    flash("Cita cancelada correctamente")
+
+    # 3) volver al cliente correcto
+    return redirect(url_for("index", cliente_id=cita["cliente_id"]))
+
+
 # ===== INDEX =====
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -186,6 +246,11 @@ def index():
         servicio = request.form["servicio"]
         fecha = request.form["fecha"]
         hora = request.form["hora"]
+
+        # Validación: evitar agendar si no hay hora elegida
+        if not hora:
+            flash("Seleccione una hora disponible")
+            return redirect(url_for("index", cliente_id=cliente_id))
 
         precio = str(servicios[servicio])
         id_cita = str(uuid.uuid4())
