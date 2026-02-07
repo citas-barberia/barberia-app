@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 import uuid
 from datetime import date
 import requests
@@ -149,6 +149,21 @@ def horas_disponibles(fecha, barbero):
     return [h for h in HORAS if h not in ocupadas]
 
 
+# ===== API HORAS DISPONIBLES =====
+@app.route("/horas")
+def obtener_horas():
+
+    fecha = request.args.get("fecha")
+    barbero = request.args.get("barbero")
+
+    if not fecha or not barbero:
+        return jsonify([])
+
+    horas = horas_disponibles(fecha, barbero)
+
+    return jsonify(horas)
+
+
 # ===== Guardar =====
 def guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora):
     with open("citas.txt", "a", encoding="utf-8") as f:
@@ -196,13 +211,7 @@ Precio: ₡{precio}
 
     citas = [c for c in leer_citas() if c["cliente_id"] == cliente_id]
 
-    # 👉 Mandamos horas al HTML
-    return render_template(
-        "index.html",
-        servicios=servicios,
-        citas=citas,
-        horas=HORAS
-    )
+    return render_template("index.html", servicios=servicios, citas=citas, horas=HORAS)
 
 
 # ===== VER CITA =====
@@ -229,6 +238,7 @@ def barbero():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
