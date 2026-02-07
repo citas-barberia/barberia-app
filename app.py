@@ -38,7 +38,7 @@ else:
 
 
 # ==========================================================
-#  MODO RESPALDO: TXT (igual que tu versión anterior)
+#  MODO RESPALDO: TXT
 # ==========================================================
 def leer_citas_txt():
     citas = []
@@ -51,7 +51,9 @@ def leer_citas_txt():
                 if len(c) < 6:
                     continue
                 citas.append({
+                    "id": None,
                     "cliente": c[0],
+                    "cliente_id": "TXT",
                     "barbero": c[1],
                     "servicio": c[2],
                     "precio": c[3],
@@ -62,7 +64,7 @@ def leer_citas_txt():
         pass
     return citas
 
-def guardar_cita_txt(cliente, barbero, servicio, precio, fecha, hora):
+def guardar_cita_txt(cliente, cliente_id, barbero, servicio, precio, fecha, hora):
     with open("citas.txt", "a", encoding="utf-8") as f:
         f.write(f"{cliente}|{barbero}|{servicio}|{precio}|{fecha}|{hora}\n")
 
@@ -77,28 +79,25 @@ def cancelar_cita_txt(cliente, barbero, fecha, hora):
 
 
 # ==========================================================
-#  SUPABASE (SQL): mismas funciones pero usando DB
-#  Tabla esperada: public.citas
-#  Columnas recomendadas:
-#    id (text/uuid, PK), cliente (text), barbero (text),
-#    servicio (text), precio (int), fecha (text o date),
-#    hora (text), created_at (timestamptz opcional)
+#  SUPABASE (SQL): usa tu tabla public.citas (la real)
+#  Columnas: id, cliente, cliente_id, barbero, servicio, precio, fecha, hora, created_at
 # ==========================================================
 def leer_citas_db():
-    # Trae todas las citas (orden opcional por created_at si existe)
     try:
-        res = supabase.table("citas").select("*").execute()
+        # Ordenar por created_at si existe (tu tabla lo tiene)
+        res = supabase.table("citas").select("*").order("created_at", desc=True).execute()
         data = res.data if res and res.data else []
-        # Asegura las llaves que usa tu HTML
+
         citas = []
         for r in data:
             citas.append({
                 "id": r.get("id"),
                 "cliente": r.get("cliente", ""),
+                "cliente_id": r.get("cliente_id", ""),
                 "barbero": r.get("barbero", ""),
                 "servicio": r.get("servicio", ""),
                 "precio": str(r.get("precio", "")),
-                "fecha": str(r.get("fecha", "")),
+                "fecha": str(r.get("fecha", "")),  # viene como 'YYYY-MM-DD'
                 "hora": str(r.get("hora", "")),
             })
         return citas
@@ -106,15 +105,16 @@ def leer_citas_db():
         print("Error leer_citas_db:", e)
         return []
 
-def guardar_cita_db(cliente, barbero, servicio, precio, fecha, hora):
+def guardar_cita_db(cliente, cliente_id, barbero, servicio, precio, fecha, hora):
     try:
         supabase.table("citas").insert({
-            "id": str(uuid.uuid4()),
+            # id NO se manda: tu tabla lo genera sola (identity)
             "cliente": cliente,
+            "cliente_id": cliente_id,
             "barbero": barbero,
             "servicio": servicio,
             "precio": int(precio),
-            "fecha": fecha,
+            "fecha": fecha,   # 'YYYY-MM-DD' -> Postgres lo castea a date
             "hora": hora
         }).execute()
         return True
@@ -123,8 +123,8 @@ def guardar_cita_db(cliente, barbero, servicio, precio, fecha, hora):
         return False
 
 def cancelar_cita_db(cliente, barbero, fecha, hora):
-    # No borramos: marcamos como CITA CANCELADA (igual que tu TXT)
     try:
+        # Marcamos como cancelada (igual que tu txt)
         supabase.table("citas").update({
             "servicio": "CITA CANCELADA"
         }).match({
@@ -145,14 +145,14 @@ def cancelar_cita_db(cliente, barbero, fecha, hora):
 def leer_citas():
     return leer_citas_db() if USAR_SUPABASE else leer_citas_txt()
 
-def guardar_cita(cliente, barbero, servicio, precio, fecha, hora):
+def guardar_cita(cliente, cliente_id, barbero, servicio, precio, fecha, hora):
     if USAR_SUPABASE:
-        ok = guardar_cita_db(cliente, barbero, servicio, precio, fecha, hora)
+        ok = guardar_cita_db(cliente, cliente_id, barbero, servicio, precio, fecha, hora)
         if not ok:
             # Si falla DB, no rompe: guarda en TXT
-            guardar_cita_txt(cliente, barbero, servicio, precio, fecha, hora)
+            guardar_cita_txt(cliente, cliente_id, barbero, servicio, precio, fecha, hora)
     else:
-        guardar_cita_txt(cliente, barbero, servicio, precio, fecha, hora)
+        guardar_cita_txt(cliente, cliente_id, barbero, servicio, precio, fecha, hora)
 
 def cancelar_cita(cliente, barbero, fecha, hora):
     if USAR_SUPABASE:
@@ -163,9 +163,19 @@ def cancelar_cita(cliente, barbero, fecha, hora):
         cancelar_cita_txt(cliente, barbero, fecha, hora)
 
 
+# ==========================================================
+#  RUTAS
+# ==========================================================
+
 # ===== Ruta del cliente =====
 @app.route("/", methods=["GET", "POST"])
 def index():
+    # Si viene cliente_id por URL, lo mantenemos.
+    # Si no, generamos uno (esto no rompe tu HTML).
+    cliente_id = request.args.get("cliente_id")
+    if not cliente_id:
+        cliente_id = str(uuid.uuid4())
+
     citas = leer_citas()
 
     if request.method == "POST":
@@ -185,21 +195,30 @@ def index():
         if conflict:
             flash("La hora seleccionada ya está ocupada. Por favor elige otra.")
         else:
-            guardar_cita(cliente, barbero, servicio, precio, fecha, hora)
+            guardar_cita(cliente, cliente_id, barbero, servicio, precio, fecha, hora)
             flash("Cita agendada exitosamente")
 
-        return redirect(url_for("index"))
+        # Volvemos a / manteniendo cliente_id en la URL
+        return redirect(url_for("index", cliente_id=cliente_id))
 
+    # Render sin romper tu index.html
     return render_template("index.html", servicios=servicios, citas=citas)
 
 
 # ===== Ruta de cancelar cita =====
 @app.route("/cancelar", methods=["POST"])
-def cancelar():
-    cliente = request.form["cliente"]
-    barbero = request.form["barbero"]
-    fecha = request.form["fecha"]
-    hora = request.form["hora"]
+def cancelar_route():
+    # OJO: esto depende de tu index.html.
+    # Si tu formulario manda "cliente/barbero/fecha/hora", funciona.
+    # Si mandas "id", lo podemos adaptar luego (sin romper).
+    cliente = request.form.get("cliente")
+    barbero = request.form.get("barbero")
+    fecha = request.form.get("fecha")
+    hora = request.form.get("hora")
+
+    if not (cliente and barbero and fecha and hora):
+        flash("Error: faltan datos para cancelar la cita.")
+        return redirect(url_for("index"))
 
     cancelar_cita(cliente, barbero, fecha, hora)
     flash("Cita cancelada")
@@ -244,4 +263,5 @@ def horas():
 # ===== Arrancar servidor =====
 if __name__ == "__main__":
     app.run(debug=True)
+
 
