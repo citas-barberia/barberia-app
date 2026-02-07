@@ -23,8 +23,21 @@ th { background: #333; color: #D4AF37; font-weight: bold; }
 tr:nth-child(even) { background: #262626; }
 tr:nth-child(odd) { background: #2b2b2b; }
 tr:hover { background: #D4AF3733; }
-.btn-whatsapp { background: #25D366; color: #fff; text-decoration: none; padding: 8px 12px; border-radius: 8px; font-weight: bold; transition: all 0.3s ease; }
+
+/* ✅ BOTÓN WHATSAPP (ARREGLADO SIN ROMPER DISEÑO) */
+.btn-whatsapp {
+    display: inline-block;
+    background: #25D366;
+    color: #fff;
+    text-decoration: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
 .btn-whatsapp:hover { background: #1ebe57; transform: scale(1.05); }
+
 .alert { padding: 12px; border-radius: 12px; margin-bottom: 20px; text-align: center; font-weight: bold; opacity: 0; animation: fadeIn 0.5s forwards, fadeOut 0.5s 2.5s forwards; }
 .alert-success { background-color: #28a745; color: #fff; }
 .alert-error { background-color: #dc3545; color: #fff; }
@@ -150,7 +163,6 @@ window.addEventListener("DOMContentLoaded", () => {
 {% endif %}
 </td>
 
-
 <td>
 {% if c.servicio != "CITA CANCELADA" %}
 <a class="btn-whatsapp" href="https://wa.me/50672314147" target="_blank">
@@ -168,4 +180,5 @@ Enviar por WhatsApp
 
 </body>
 </html>
+
 
