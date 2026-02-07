@@ -24,7 +24,7 @@ servicios = {
 }
 
 # ===== HORAS DISPONIBLES =====
-HORAS = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00"]
+HORAS = ["09:00am", "10:00am", "11:00am", "1:00pm", "2:00pm", "3:00pm", "4:00pm", "5:00pm"]
 
 
 # ===== Enviar mensaje al barbero =====
