@@ -79,6 +79,22 @@ def enviar_whatsapp_respuesta(numero, mensaje):
         print("Error enviando WhatsApp al cliente:", e)
 
 
+# ✅ Confirmación automática al cliente
+def enviar_confirmacion_cliente(cliente_numero, cliente, barbero, servicio, fecha, hora, precio):
+    mensaje = f"""✅ Cita confirmada en Barbería José 💈
+
+Cliente: {cliente}
+Barbero: {barbero}
+Servicio: {servicio}
+Fecha: {fecha}
+Hora: {hora}
+Total: ₡{precio}
+
+Si necesitas cancelar, entra al link donde agendaste la cita.
+"""
+    enviar_whatsapp_respuesta(cliente_numero, mensaje)
+
+
 # ===== WEBHOOK =====
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook():
@@ -94,8 +110,15 @@ def webhook():
     if request.method == "POST":
         data = request.get_json()
 
+        # ✅ Evitar responder dos veces por reintentos / status updates
         try:
-            numero = data["entry"][0]["changes"][0]["value"]["messages"][0]["from"]
+            value = data["entry"][0]["changes"][0]["value"]
+
+            # Si no viene "messages", no es un mensaje entrante (puede ser status)
+            if "messages" not in value:
+                return "ok", 200
+
+            numero = value["messages"][0]["from"]
             link = f"{DOMINIO}/?cliente_id={numero}"
 
             mensaje = f"""Hola 👋 Bienvenido a Barbería José 💈
@@ -202,8 +225,7 @@ def cancelar():
     eliminar_cita(id_cita)
 
     # 2) avisar al barbero por WhatsApp
-    mensaje = f"""
-❌ Cita CANCELADA
+    mensaje_barbero = f"""❌ Cita CANCELADA
 
 Cliente: {cita['cliente']}
 Barbero: {cita['barbero']}
@@ -211,7 +233,19 @@ Servicio: {cita['servicio']}
 Fecha: {cita['fecha']}
 Hora: {cita['hora']}
 """
-    enviar_whatsapp(mensaje)
+    enviar_whatsapp(mensaje_barbero)
+
+    # ✅ Avisar también al cliente (si su cliente_id es número)
+    if str(cita["cliente_id"]).isdigit():
+        mensaje_cliente = f"""❌ Tu cita fue cancelada
+
+Barbero: {cita['barbero']}
+Fecha: {cita['fecha']}
+Hora: {cita['hora']}
+
+Si deseas agendar de nuevo, entra al link.
+"""
+        enviar_whatsapp_respuesta(cita["cliente_id"], mensaje_cliente)
 
     flash("Cita cancelada correctamente")
 
@@ -244,8 +278,7 @@ def index():
 
         guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
 
-        mensaje = f"""
-💈 Nueva cita agendada
+        mensaje_barbero = f"""💈 Nueva cita agendada
 
 Cliente: {cliente}
 Barbero: {barbero}
@@ -254,7 +287,11 @@ Fecha: {fecha}
 Hora: {hora}
 Precio: ₡{precio}
 """
-        enviar_whatsapp(mensaje)
+        enviar_whatsapp(mensaje_barbero)
+
+        # ✅ Confirmación automática al cliente (si cliente_id es número)
+        if str(cliente_id).isdigit():
+            enviar_confirmacion_cliente(cliente_id, cliente, barbero, servicio, fecha, hora, precio)
 
         flash("Cita agendada exitosamente")
         return redirect(url_for("ver_cita", id_cita=id_cita, cliente_id=cliente_id))
@@ -285,6 +322,7 @@ def barbero():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
