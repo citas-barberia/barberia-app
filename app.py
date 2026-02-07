@@ -23,6 +23,10 @@ servicios = {
     "Solo cejas": 2000
 }
 
+# ===== HORAS DISPONIBLES =====
+HORAS = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00"]
+
+
 # ===== Enviar mensaje al barbero =====
 def enviar_whatsapp(mensaje):
 
@@ -67,7 +71,6 @@ def enviar_whatsapp_respuesta(numero, mensaje):
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook():
 
-    # ===== Verificación Meta =====
     if request.method == "GET":
 
         token = request.args.get("hub.verify_token")
@@ -78,7 +81,6 @@ def webhook():
         return "Token incorrecto", 403
 
 
-    # ===== Recibir mensajes =====
     if request.method == "POST":
 
         data = request.get_json()
@@ -136,6 +138,17 @@ def leer_citas():
     return citas
 
 
+# ===== HORAS DISPONIBLES SEGUN FECHA Y BARBERO =====
+def horas_disponibles(fecha, barbero):
+
+    ocupadas = [
+        c["hora"] for c in leer_citas()
+        if c["fecha"] == fecha and c["barbero"] == barbero
+    ]
+
+    return [h for h in HORAS if h not in ocupadas]
+
+
 # ===== Guardar =====
 def guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora):
     with open("citas.txt", "a", encoding="utf-8") as f:
@@ -183,7 +196,13 @@ Precio: ₡{precio}
 
     citas = [c for c in leer_citas() if c["cliente_id"] == cliente_id]
 
-    return render_template("index.html", servicios=servicios, citas=citas)
+    # 👉 Mandamos horas al HTML
+    return render_template(
+        "index.html",
+        servicios=servicios,
+        citas=citas,
+        horas=HORAS
+    )
 
 
 # ===== VER CITA =====
@@ -199,7 +218,7 @@ def ver_cita(id_cita):
     if not cita:
         return "Cita no encontrada", 404
 
-    return render_template("index.html", servicios=servicios, citas=[cita])
+    return render_template("index.html", servicios=servicios, citas=[cita], horas=HORAS)
 
 
 # ===== PANEL BARBERO =====
