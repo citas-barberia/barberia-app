@@ -6,7 +6,7 @@ import requests
 app = Flask(__name__)
 app.secret_key = "secret_key"
 
-VERIFY_TOKEN = "EAAMIUG0X8IgBQoIZAFONUajmIdhMuMJZCpa6ar03D1ItwCnY3cH2jWJ0eRiLCMbNlyGXMXNKa82B4YQitt51Myjq7aQ6hZATy7N4V5Rq8My3Iozxl04ZAJ6xovh0WurN8zbjk8VvZB6hSzOCKBQELAwkwcZCUHQ6bAkw1poq6ZCVF7RbZBp1FQAiIUvhU0zduWePC0yV8ryjWItXAXICZColky8hiZA4o11BFPR5ZA04lsRkhLOYdDupK0sD8sESng3f6Y0AQZBNtizI37ts7IIFxEG4DQZDZD"
+VERIFY_TOKEN= "barberia123"
 NUMERO_BARBERO = "50672314147"
 DOMINIO = "https://barberia-app-1.onrender.com"
 
