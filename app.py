@@ -1,14 +1,19 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash
 import uuid
 from datetime import date
 import requests
+import os
 
 app = Flask(__name__)
 app.secret_key = "secret_key"
 
-VERIFY_TOKEN= "barberia123"
+# ===== CONFIG =====
+VERIFY_TOKEN = "barberia123"
 NUMERO_BARBERO = "50672314147"
 DOMINIO = "https://barberia-app-1.onrender.com"
+
+WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
+PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
 
 # ===== Servicios =====
 servicios = {
@@ -21,10 +26,10 @@ servicios = {
 # ===== Enviar mensaje al barbero =====
 def enviar_whatsapp(mensaje):
 
-    url = "https://graph.facebook.com/v22.0/994974633695883/messages"
+    url = f"https://graph.facebook.com/v22.0/{PHONE_NUMBER_ID}/messages"
 
     headers = {
-        "Authorization": "Bearer TU_TOKEN_AQUI",
+        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
         "Content-Type": "application/json"
     }
 
@@ -41,10 +46,10 @@ def enviar_whatsapp(mensaje):
 # ===== Responder cliente =====
 def enviar_whatsapp_respuesta(numero, mensaje):
 
-    url = "https://graph.facebook.com/v22.0/994974633695883/messages"
+    url = f"https://graph.facebook.com/v22.0/{PHONE_NUMBER_ID}/messages"
 
     headers = {
-        "Authorization": "Bearer TU_TOKEN_AQUI",
+        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
         "Content-Type": "application/json"
     }
 
@@ -62,6 +67,7 @@ def enviar_whatsapp_respuesta(numero, mensaje):
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook():
 
+    # ===== Verificación Meta =====
     if request.method == "GET":
 
         token = request.args.get("hub.verify_token")
@@ -72,6 +78,7 @@ def webhook():
         return "Token incorrecto", 403
 
 
+    # ===== Recibir mensajes =====
     if request.method == "POST":
 
         data = request.get_json()
@@ -203,6 +210,7 @@ def barbero():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
