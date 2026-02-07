@@ -157,11 +157,17 @@ window.addEventListener("DOMContentLoaded", () => {
 <td>
 {% if c.servicio != "CITA CANCELADA" %}
 <form method="POST" action="{{ url_for('cancelar') }}">
-<input type="hidden" name="id" value="{{ c.id }}">
-<button type="submit">Cancelar</button>
+    <input type="hidden" name="id" value="{{ c.id }}">
+    <input type="hidden" name="cliente" value="{{ c.cliente }}">
+    <input type="hidden" name="cliente_id" value="{{ c.cliente_id }}">
+    <input type="hidden" name="barbero" value="{{ c.barbero }}">
+    <input type="hidden" name="fecha" value="{{ c.fecha }}">
+    <input type="hidden" name="hora" value="{{ c.hora }}">
+    <button type="submit">Cancelar</button>
 </form>
 {% endif %}
 </td>
+
 
 <td>
 {% if c.servicio != "CITA CANCELADA" %}
