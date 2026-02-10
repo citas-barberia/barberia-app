@@ -5,20 +5,20 @@ import uuid
 import requests
 
 app = Flask(__name__)
-app.secret_key = "secret_key"  # Necesario para mensajes flash
+app.secret_key = "secret_key"
 
 # =========================
 # CONFIG WHATSAPP (Meta)
 # =========================
-VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "barberia123")  # para /webhook GET
-NUMERO_BARBERO = os.getenv("NUMERO_BARBERO", "50672314147")  # a quién le llega todo
+VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "barberia123")
+NUMERO_BARBERO = os.getenv("NUMERO_BARBERO", "50672314147")
 DOMINIO = os.getenv("DOMINIO", "https://barberia-app-1.onrender.com")
 
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
 
 
-def enviar_whatsapp(to_numero: str, mensaje: str):
+def enviar_whatsapp(to_numero: str, mensaje: str) -> bool:
     """Envía un WhatsApp por Cloud API."""
     if not WHATSAPP_TOKEN or not PHONE_NUMBER_ID:
         print("⚠️ Faltan WHATSAPP_TOKEN o PHONE_NUMBER_ID en variables de entorno")
@@ -65,6 +65,7 @@ servicios = {
     "Solo cejas": 2000,
 }
 
+# Mantener horas “latinas” como pediste
 HORAS_BASE = ["09:00am", "10:00am", "11:00am", "12:00md", "1:00pm", "2:00pm", "3:00pm", "4:00pm", "5:00pm"]
 
 
@@ -80,7 +81,6 @@ USAR_SUPABASE = False
 if SUPABASE_URL and SUPABASE_KEY:
     try:
         from supabase import create_client
-
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
         USAR_SUPABASE = True
         print("✅ Supabase conectado")
@@ -93,7 +93,9 @@ else:
 
 # ==========================================================
 #  RESPALDO TXT
-#  Formato: cliente|cliente_id|barbero|servicio|precio|fecha|hora
+#  Soporta:
+#   - Viejo: cliente|cliente_id|barbero|servicio|precio|fecha|hora  (7 campos)
+#   - Nuevo: id|cliente|cliente_id|barbero|servicio|precio|fecha|hora (8 campos)
 # ==========================================================
 def leer_citas_txt():
     citas = []
@@ -103,53 +105,73 @@ def leer_citas_txt():
                 if not linea.strip():
                     continue
                 c = linea.strip().split("|")
-                if len(c) != 7:
+
+                # Formato nuevo (8)
+                if len(c) == 8:
+                    id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora = c
+                    citas.append({
+                        "id": id_cita,
+                        "cliente": cliente,
+                        "cliente_id": cliente_id,
+                        "barbero": barbero,
+                        "servicio": servicio,
+                        "precio": precio,
+                        "fecha": fecha,
+                        "hora": hora,
+                    })
                     continue
 
-                cliente, cliente_id, barbero, servicio, precio, fecha, hora = c
-                citas.append({
-                    "id": None,
-                    "cliente": cliente,
-                    "cliente_id": cliente_id,
-                    "barbero": barbero,
-                    "servicio": servicio,
-                    "precio": precio,
-                    "fecha": fecha,
-                    "hora": hora,
-                })
+                # Formato viejo (7)
+                if len(c) == 7:
+                    cliente, cliente_id, barbero, servicio, precio, fecha, hora = c
+                    citas.append({
+                        "id": None,
+                        "cliente": cliente,
+                        "cliente_id": cliente_id,
+                        "barbero": barbero,
+                        "servicio": servicio,
+                        "precio": precio,
+                        "fecha": fecha,
+                        "hora": hora,
+                    })
+                    continue
+
     except FileNotFoundError:
         pass
+
     return citas
 
 
-def guardar_cita_txt(cliente, cliente_id, barbero, servicio, precio, fecha, hora):
+def guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora):
     with open("citas.txt", "a", encoding="utf-8") as f:
-        f.write(f"{cliente}|{cliente_id}|{barbero}|{servicio}|{precio}|{fecha}|{hora}\n")
+        f.write(f"{id_cita}|{cliente}|{cliente_id}|{barbero}|{servicio}|{precio}|{fecha}|{hora}\n")
 
 
-def cancelar_cita_txt(id_cita, cliente, cliente_id, barbero, fecha, hora):
-    """Marca como CITA CANCELADA, no borra."""
+def cancelar_cita_txt_por_id(id_cita):
+    """Marca como CITA CANCELADA por ID."""
     citas = leer_citas_txt()
     with open("citas.txt", "w", encoding="utf-8") as f:
         for c in citas:
-            if (
-                c["cliente"] == cliente and
-                c["cliente_id"] == cliente_id and
-                c["barbero"] == barbero and
-                c["fecha"] == fecha and
-                c["hora"] == hora and
-                c["servicio"] != "CITA CANCELADA"
-            ):
-                f.write(f"{c['cliente']}|{c['cliente_id']}|{c['barbero']}|CITA CANCELADA|{c['precio']}|{c['fecha']}|{c['hora']}\n")
+            if c.get("id") == id_cita and c["servicio"] != "CITA CANCELADA":
+                f.write(f"{c.get('id')}|{c['cliente']}|{c['cliente_id']}|{c['barbero']}|CITA CANCELADA|{c['precio']}|{c['fecha']}|{c['hora']}\n")
             else:
-                f.write(f"{c['cliente']}|{c['cliente_id']}|{c['barbero']}|{c['servicio']}|{c['precio']}|{c['fecha']}|{c['hora']}\n")
+                # re-escribimos en formato nuevo si ya tiene id, si no, le damos uno para que quede fijo
+                cid = c.get("id") or str(uuid.uuid4())
+                f.write(f"{cid}|{c['cliente']}|{c['cliente_id']}|{c['barbero']}|{c['servicio']}|{c['precio']}|{c['fecha']}|{c['hora']}\n")
+
+
+def buscar_cita_txt_por_id(id_cita):
+    for c in leer_citas_txt():
+        if c.get("id") == id_cita:
+            return c
+    return None
 
 
 # ==========================================================
 #  SUPABASE DB: tabla public.citas
-#  columnas esperadas según tu screenshot:
-#  id (bigint identity), cliente text, cliente_id text, barbero text,
-#  servicio text, precio bigint, fecha date, hora text, created_at timestamptz
+#  columnas esperadas:
+#   id (bigint identity), cliente text, cliente_id text, barbero text,
+#   servicio text, precio bigint, fecha date, hora text, created_at timestamptz
 # ==========================================================
 def leer_citas_db():
     try:
@@ -181,7 +203,7 @@ def guardar_cita_db(cliente, cliente_id, barbero, servicio, precio, fecha, hora)
             "barbero": barbero,
             "servicio": servicio,
             "precio": int(precio),
-            "fecha": fecha,     # supabase acepta string "YYYY-MM-DD" para date
+            "fecha": fecha,
             "hora": hora
         }).execute()
         return True
@@ -190,60 +212,75 @@ def guardar_cita_db(cliente, cliente_id, barbero, servicio, precio, fecha, hora)
         return False
 
 
-def cancelar_cita_db(id_cita=None, cliente=None, cliente_id=None, barbero=None, fecha=None, hora=None):
-    """Marca como CITA CANCELADA. Preferimos match por id si existe."""
+def buscar_cita_db_por_id(id_cita):
     try:
-        q = supabase.table("citas").update({"servicio": "CITA CANCELADA"})
+        res = supabase.table("citas").select("*").eq("id", id_cita).limit(1).execute()
+        data = res.data if res and res.data else []
+        if not data:
+            return None
+        r = data[0]
+        return {
+            "id": r.get("id"),
+            "cliente": r.get("cliente", ""),
+            "cliente_id": r.get("cliente_id", ""),
+            "barbero": r.get("barbero", ""),
+            "servicio": r.get("servicio", ""),
+            "precio": str(r.get("precio", "")),
+            "fecha": str(r.get("fecha", "")),
+            "hora": str(r.get("hora", "")),
+        }
+    except Exception as e:
+        print("Error buscar_cita_db_por_id:", e)
+        return None
 
-        if id_cita is not None:
-            q = q.eq("id", id_cita)
-        else:
-            q = q.match({
-                "cliente": cliente,
-                "cliente_id": str(cliente_id),
-                "barbero": barbero,
-                "fecha": fecha,
-                "hora": hora,
-            })
 
-        q.execute()
+def cancelar_cita_db_por_id(id_cita):
+    try:
+        supabase.table("citas").update({"servicio": "CITA CANCELADA"}).eq("id", id_cita).execute()
         return True
     except Exception as e:
-        print("Error cancelar_cita_db:", e)
+        print("Error cancelar_cita_db_por_id:", e)
         return False
 
 
 # ==========================================================
-#  WRAPPERS: elige DB o TXT automáticamente
+#  WRAPPERS: DB o TXT
 # ==========================================================
 def leer_citas():
     return leer_citas_db() if USAR_SUPABASE else leer_citas_txt()
 
 
-def guardar_cita(cliente, cliente_id, barbero, servicio, precio, fecha, hora):
+def guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora):
     if USAR_SUPABASE:
         ok = guardar_cita_db(cliente, cliente_id, barbero, servicio, precio, fecha, hora)
         if not ok:
-            guardar_cita_txt(cliente, cliente_id, barbero, servicio, precio, fecha, hora)
+            guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
     else:
-        guardar_cita_txt(cliente, cliente_id, barbero, servicio, precio, fecha, hora)
+        guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
 
 
-def cancelar_cita(id_cita, cliente, cliente_id, barbero, fecha, hora):
+def buscar_cita_por_id(id_cita):
     if USAR_SUPABASE:
-        ok = cancelar_cita_db(id_cita=id_cita, cliente=cliente, cliente_id=cliente_id, barbero=barbero, fecha=fecha, hora=hora)
-        if not ok:
-            cancelar_cita_txt(id_cita, cliente, cliente_id, barbero, fecha, hora)
-    else:
-        cancelar_cita_txt(id_cita, cliente, cliente_id, barbero, fecha, hora)
+        c = buscar_cita_db_por_id(id_cita)
+        if c:
+            return c
+    return buscar_cita_txt_por_id(id_cita)
+
+
+def cancelar_cita_por_id(id_cita):
+    if USAR_SUPABASE:
+        ok = cancelar_cita_db_por_id(id_cita)
+        if ok:
+            return True
+    cancelar_cita_txt_por_id(id_cita)
+    return True
 
 
 # =========================
-# WEBHOOK (opcional pero recomendado)
+# WEBHOOK (Meta)
 # =========================
 @app.route("/webhook", methods=["GET", "POST"])
 def webhook():
-    # Verificación Meta
     if request.method == "GET":
         token = request.args.get("hub.verify_token")
         challenge = request.args.get("hub.challenge")
@@ -251,7 +288,6 @@ def webhook():
             return challenge
         return "Token incorrecto", 403
 
-    # Mensaje entrante
     data = request.get_json()
     try:
         value = data["entry"][0]["changes"][0]["value"]
@@ -278,13 +314,13 @@ Para agendar tu cita entra aquí:
 # =========================
 @app.route("/", methods=["GET", "POST"])
 def index():
-    # Si vienen desde WhatsApp: /?cliente_id=506xxxx
     cliente_id = request.args.get("cliente_id")
     if not cliente_id:
-        # Si entra normal desde navegador, igual funciona:
         cliente_id = str(uuid.uuid4())
 
-    citas = leer_citas()
+    citas_todas = leer_citas()
+    # ✅ CLAVE: el cliente solo ve SUS citas
+    citas_cliente = [c for c in citas_todas if str(c.get("cliente_id", "")) == str(cliente_id)]
 
     if request.method == "POST":
         cliente = request.form.get("cliente", "").strip()
@@ -293,25 +329,27 @@ def index():
         fecha = request.form.get("fecha", "").strip()
         hora = request.form.get("hora", "").strip()
 
-        # cliente_id puede venir como hidden input
+        # Por si algún día lo metes como hidden input
         cliente_id_form = request.form.get("cliente_id")
         if cliente_id_form:
             cliente_id = cliente_id_form.strip()
 
         precio = str(servicios.get(servicio, 0))
 
-        # Conflicto: misma fecha+hora+barbero, y no cancelada
+        # ✅ Conflicto: misma fecha+hora+barbero, y no cancelada
         conflict = any(
             c["barbero"] == barbero and c["fecha"] == fecha and c["hora"] == hora and c["servicio"] != "CITA CANCELADA"
-            for c in citas
+            for c in citas_todas
         )
 
         if conflict:
             flash("La hora seleccionada ya está ocupada. Por favor elige otra.")
             return redirect(url_for("index", cliente_id=cliente_id))
 
+        id_cita = str(uuid.uuid4())
+
         # Guardar
-        guardar_cita(cliente, cliente_id, barbero, servicio, precio, fecha, hora)
+        guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
 
         # WhatsApp al barbero
         msg_barbero = f"""💈 Nueva cita agendada
@@ -336,27 +374,39 @@ Fecha: {fecha}
 Hora: {hora}
 Total: ₡{precio}
 
-Si necesitas cancelar, entra al link donde agendaste.
+Para cancelar: abre el mismo link donde agendaste y toca "Cancelar".
 """
             enviar_whatsapp(cliente_id, msg_cliente)
 
         flash("Cita agendada exitosamente")
         return redirect(url_for("index", cliente_id=cliente_id))
 
-    return render_template("index.html", servicios=servicios, citas=citas, cliente_id=cliente_id)
+    # ✅ IMPORTANTE: tu HTML usa c.id / c.cliente / etc
+    return render_template("index.html", servicios=servicios, citas=citas_cliente, cliente_id=cliente_id)
 
 
 @app.route("/cancelar", methods=["POST"])
 def cancelar():
-    # Para cancelar sin errores, recibimos todo lo necesario
-    id_cita = request.form.get("id")  # puede venir vacío
-    cliente = request.form.get("cliente", "").strip()
-    cliente_id = request.form.get("cliente_id", "").strip()
-    barbero = request.form.get("barbero", "").strip()
-    fecha = request.form.get("fecha", "").strip()
-    hora = request.form.get("hora", "").strip()
+    # ✅ Tu index.html manda solo: id
+    id_cita = request.form.get("id")
+    if not id_cita:
+        flash("Error: no se recibió el ID de la cita")
+        return redirect(url_for("index"))
 
-    cancelar_cita(id_cita, cliente, cliente_id, barbero, fecha, hora)
+    # 1) Buscar detalles para mandar mensajes
+    cita = buscar_cita_por_id(id_cita)
+    if not cita:
+        flash("No se encontró la cita")
+        return redirect(url_for("index"))
+
+    # 2) Cancelar en DB/TXT
+    cancelar_cita_por_id(id_cita)
+
+    cliente = cita.get("cliente", "")
+    cliente_id = str(cita.get("cliente_id", ""))
+    barbero = cita.get("barbero", "")
+    fecha = cita.get("fecha", "")
+    hora = cita.get("hora", "")
 
     # WhatsApp barbero
     msg_barbero = f"""❌ Cita CANCELADA
@@ -380,8 +430,8 @@ Si deseas agendar de nuevo, entra al link.
 """
         enviar_whatsapp(cliente_id, msg_cliente)
 
-    flash("Cita cancelada")
-    return redirect(url_for("index", cliente_id=cliente_id if cliente_id else None))
+    flash("Cita cancelada correctamente")
+    return redirect(url_for("index", cliente_id=cliente_id))
 
 
 @app.route("/barbero")
@@ -406,16 +456,19 @@ def horas():
         return jsonify([])
 
     citas = leer_citas()
+    # ✅ Ocupadas (NO canceladas)
     ocupadas = [
         c["hora"] for c in citas
         if c["barbero"] == barbero and c["fecha"] == fecha and c["servicio"] != "CITA CANCELADA"
     ]
+
     disponibles = [h for h in HORAS_BASE if h not in ocupadas]
     return jsonify(disponibles)
 
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
