@@ -65,7 +65,7 @@ servicios = {
     "Solo cejas": 2000,
 }
 
-# Mantener horas “latinas” como pediste
+# Mantener horas “latinas”
 HORAS_BASE = ["09:00am", "10:00am", "11:00am", "12:00md", "1:00pm", "2:00pm", "3:00pm", "4:00pm", "5:00pm"]
 
 
@@ -96,6 +96,7 @@ else:
 #  Soporta:
 #   - Viejo: cliente|cliente_id|barbero|servicio|precio|fecha|hora  (7 campos)
 #   - Nuevo: id|cliente|cliente_id|barbero|servicio|precio|fecha|hora (8 campos)
+#  ✅ Importante: si viene sin id, se le asigna uno AL LEER (para que cancelar funcione)
 # ==========================================================
 def leer_citas_txt():
     citas = []
@@ -109,6 +110,8 @@ def leer_citas_txt():
                 # Formato nuevo (8)
                 if len(c) == 8:
                     id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora = c
+                    if not id_cita:
+                        id_cita = str(uuid.uuid4())
                     citas.append({
                         "id": id_cita,
                         "cliente": cliente,
@@ -121,11 +124,12 @@ def leer_citas_txt():
                     })
                     continue
 
-                # Formato viejo (7)
+                # Formato viejo (7) -> le creamos id
                 if len(c) == 7:
                     cliente, cliente_id, barbero, servicio, precio, fecha, hora = c
+                    id_cita = str(uuid.uuid4())
                     citas.append({
-                        "id": None,
+                        "id": id_cita,
                         "cliente": cliente,
                         "cliente_id": cliente_id,
                         "barbero": barbero,
@@ -152,17 +156,16 @@ def cancelar_cita_txt_por_id(id_cita):
     citas = leer_citas_txt()
     with open("citas.txt", "w", encoding="utf-8") as f:
         for c in citas:
-            if c.get("id") == id_cita and c["servicio"] != "CITA CANCELADA":
-                f.write(f"{c.get('id')}|{c['cliente']}|{c['cliente_id']}|{c['barbero']}|CITA CANCELADA|{c['precio']}|{c['fecha']}|{c['hora']}\n")
+            cid = c.get("id") or str(uuid.uuid4())
+            if cid == id_cita and c["servicio"] != "CITA CANCELADA":
+                f.write(f"{cid}|{c['cliente']}|{c['cliente_id']}|{c['barbero']}|CITA CANCELADA|{c['precio']}|{c['fecha']}|{c['hora']}\n")
             else:
-                # re-escribimos en formato nuevo si ya tiene id, si no, le damos uno para que quede fijo
-                cid = c.get("id") or str(uuid.uuid4())
                 f.write(f"{cid}|{c['cliente']}|{c['cliente_id']}|{c['barbero']}|{c['servicio']}|{c['precio']}|{c['fecha']}|{c['hora']}\n")
 
 
 def buscar_cita_txt_por_id(id_cita):
     for c in leer_citas_txt():
-        if c.get("id") == id_cita:
+        if str(c.get("id")) == str(id_cita):
             return c
     return None
 
@@ -314,12 +317,15 @@ Para agendar tu cita entra aquí:
 # =========================
 @app.route("/", methods=["GET", "POST"])
 def index():
+    # ✅ cliente_id viene desde el link /?cliente_id=506xxxx
     cliente_id = request.args.get("cliente_id")
     if not cliente_id:
+        # si entra sin link, se genera uno (pero entonces no verá citas anteriores)
         cliente_id = str(uuid.uuid4())
 
     citas_todas = leer_citas()
-    # ✅ CLAVE: el cliente solo ve SUS citas
+
+    # ✅ El cliente solo ve SUS citas
     citas_cliente = [c for c in citas_todas if str(c.get("cliente_id", "")) == str(cliente_id)]
 
     if request.method == "POST":
@@ -329,7 +335,7 @@ def index():
         fecha = request.form.get("fecha", "").strip()
         hora = request.form.get("hora", "").strip()
 
-        # Por si algún día lo metes como hidden input
+        # ✅ mantener cliente_id aunque el POST no traiga querystring
         cliente_id_form = request.form.get("cliente_id")
         if cliente_id_form:
             cliente_id = cliente_id_form.strip()
@@ -381,13 +387,12 @@ Para cancelar: abre el mismo link donde agendaste y toca "Cancelar".
         flash("Cita agendada exitosamente")
         return redirect(url_for("index", cliente_id=cliente_id))
 
-    # ✅ IMPORTANTE: tu HTML usa c.id / c.cliente / etc
     return render_template("index.html", servicios=servicios, citas=citas_cliente, cliente_id=cliente_id)
 
 
 @app.route("/cancelar", methods=["POST"])
 def cancelar():
-    # ✅ Tu index.html manda solo: id
+    # ✅ tu index.html manda: id
     id_cita = request.form.get("id")
     if not id_cita:
         flash("Error: no se recibió el ID de la cita")
@@ -456,6 +461,7 @@ def horas():
         return jsonify([])
 
     citas = leer_citas()
+
     # ✅ Ocupadas (NO canceladas)
     ocupadas = [
         c["hora"] for c in citas
@@ -468,6 +474,7 @@ def horas():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 

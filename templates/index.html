@@ -110,6 +110,9 @@ window.addEventListener("DOMContentLoaded", () => {
 
 <form method="POST">
 
+ <input type="hidden" name="cliente_id" value="{{ cliente_id }}">
+   
+
 <input type="text" name="cliente" placeholder="Tu nombre" required>
 
 <input type="text" name="barbero" id="barbero" placeholder="Nombre del barbero" oninput="actualizarHoras()" required>
