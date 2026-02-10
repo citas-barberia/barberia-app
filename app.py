@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, flash, url_for, jsonify
+from flask import Flask, render_template, request, redirect, flash, url_for, jsonify, make_response
 from datetime import date
 import os
 import uuid
@@ -96,7 +96,6 @@ else:
 #  Soporta:
 #   - Viejo: cliente|cliente_id|barbero|servicio|precio|fecha|hora  (7 campos)
 #   - Nuevo: id|cliente|cliente_id|barbero|servicio|precio|fecha|hora (8 campos)
-#  ✅ Importante: si viene sin id, se le asigna uno AL LEER (para que cancelar funcione)
 # ==========================================================
 def leer_citas_txt():
     citas = []
@@ -110,8 +109,6 @@ def leer_citas_txt():
                 # Formato nuevo (8)
                 if len(c) == 8:
                     id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora = c
-                    if not id_cita:
-                        id_cita = str(uuid.uuid4())
                     citas.append({
                         "id": id_cita,
                         "cliente": cliente,
@@ -124,12 +121,11 @@ def leer_citas_txt():
                     })
                     continue
 
-                # Formato viejo (7) -> le creamos id
+                # Formato viejo (7)
                 if len(c) == 7:
                     cliente, cliente_id, barbero, servicio, precio, fecha, hora = c
-                    id_cita = str(uuid.uuid4())
                     citas.append({
-                        "id": id_cita,
+                        "id": None,
                         "cliente": cliente,
                         "cliente_id": cliente_id,
                         "barbero": barbero,
@@ -156,10 +152,10 @@ def cancelar_cita_txt_por_id(id_cita):
     citas = leer_citas_txt()
     with open("citas.txt", "w", encoding="utf-8") as f:
         for c in citas:
-            cid = c.get("id") or str(uuid.uuid4())
-            if cid == id_cita and c["servicio"] != "CITA CANCELADA":
-                f.write(f"{cid}|{c['cliente']}|{c['cliente_id']}|{c['barbero']}|CITA CANCELADA|{c['precio']}|{c['fecha']}|{c['hora']}\n")
+            if c.get("id") == id_cita and c["servicio"] != "CITA CANCELADA":
+                f.write(f"{c.get('id')}|{c['cliente']}|{c['cliente_id']}|{c['barbero']}|CITA CANCELADA|{c['precio']}|{c['fecha']}|{c['hora']}\n")
             else:
+                cid = c.get("id") or str(uuid.uuid4())
                 f.write(f"{cid}|{c['cliente']}|{c['cliente_id']}|{c['barbero']}|{c['servicio']}|{c['precio']}|{c['fecha']}|{c['hora']}\n")
 
 
@@ -171,10 +167,7 @@ def buscar_cita_txt_por_id(id_cita):
 
 
 # ==========================================================
-#  SUPABASE DB: tabla public.citas
-#  columnas esperadas:
-#   id (bigint identity), cliente text, cliente_id text, barbero text,
-#   servicio text, precio bigint, fecha date, hora text, created_at timestamptz
+#  SUPABASE DB
 # ==========================================================
 def leer_citas_db():
     try:
@@ -247,7 +240,7 @@ def cancelar_cita_db_por_id(id_cita):
 
 
 # ==========================================================
-#  WRAPPERS: DB o TXT
+#  WRAPPERS
 # ==========================================================
 def leer_citas():
     return leer_citas_db() if USAR_SUPABASE else leer_citas_txt()
@@ -298,12 +291,16 @@ def webhook():
             return "ok", 200
 
         numero = value["messages"][0]["from"]
+
+        # Link con cliente_id
         link = f"{DOMINIO}/?cliente_id={numero}"
 
         mensaje = f"""Hola 👋 Bienvenido a Barbería José 💈
 
 Para agendar tu cita entra aquí:
 {link}
+
+(Guarda este link para cancelar luego)
 """
         enviar_whatsapp(numero, mensaje)
     except Exception as e:
@@ -317,15 +314,18 @@ Para agendar tu cita entra aquí:
 # =========================
 @app.route("/", methods=["GET", "POST"])
 def index():
-    # ✅ cliente_id viene desde el link /?cliente_id=506xxxx
-    cliente_id = request.args.get("cliente_id")
-    if not cliente_id:
-        # si entra sin link, se genera uno (pero entonces no verá citas anteriores)
+    # 1) Si viene por URL, úsalo y guárdalo en cookie
+    cliente_id_url = request.args.get("cliente_id")
+    cliente_id_cookie = request.cookies.get("cliente_id")
+
+    if cliente_id_url:
+        cliente_id = str(cliente_id_url).strip()
+    elif cliente_id_cookie:
+        cliente_id = str(cliente_id_cookie).strip()
+    else:
         cliente_id = str(uuid.uuid4())
 
     citas_todas = leer_citas()
-
-    # ✅ El cliente solo ve SUS citas
     citas_cliente = [c for c in citas_todas if str(c.get("cliente_id", "")) == str(cliente_id)]
 
     if request.method == "POST":
@@ -335,14 +335,13 @@ def index():
         fecha = request.form.get("fecha", "").strip()
         hora = request.form.get("hora", "").strip()
 
-        # ✅ mantener cliente_id aunque el POST no traiga querystring
+        # Si el form manda cliente_id (por si acaso), respétalo
         cliente_id_form = request.form.get("cliente_id")
         if cliente_id_form:
-            cliente_id = cliente_id_form.strip()
+            cliente_id = str(cliente_id_form).strip()
 
         precio = str(servicios.get(servicio, 0))
 
-        # ✅ Conflicto: misma fecha+hora+barbero, y no cancelada
         conflict = any(
             c["barbero"] == barbero and c["fecha"] == fecha and c["hora"] == hora and c["servicio"] != "CITA CANCELADA"
             for c in citas_todas
@@ -350,14 +349,13 @@ def index():
 
         if conflict:
             flash("La hora seleccionada ya está ocupada. Por favor elige otra.")
-            return redirect(url_for("index", cliente_id=cliente_id))
+            resp = make_response(redirect(url_for("index", cliente_id=cliente_id)))
+            resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)  # 1 año
+            return resp
 
         id_cita = str(uuid.uuid4())
-
-        # Guardar
         guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
 
-        # WhatsApp al barbero
         msg_barbero = f"""💈 Nueva cita agendada
 
 Cliente: {cliente}
@@ -369,8 +367,8 @@ Precio: ₡{precio}
 """
         enviar_whatsapp(NUMERO_BARBERO, msg_barbero)
 
-        # WhatsApp al cliente (si venía desde WA con número real)
         if es_numero_whatsapp(cliente_id):
+            link = f"{DOMINIO}/?cliente_id={cliente_id}"
             msg_cliente = f"""✅ Cita confirmada 💈
 
 Cliente: {cliente}
@@ -380,31 +378,34 @@ Fecha: {fecha}
 Hora: {hora}
 Total: ₡{precio}
 
-Para cancelar: abre el mismo link donde agendaste y toca "Cancelar".
+Para cancelar: entra a este link:
+{link}
 """
             enviar_whatsapp(cliente_id, msg_cliente)
 
         flash("Cita agendada exitosamente")
-        return redirect(url_for("index", cliente_id=cliente_id))
+        resp = make_response(redirect(url_for("index", cliente_id=cliente_id)))
+        resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)  # 1 año
+        return resp
 
-    return render_template("index.html", servicios=servicios, citas=citas_cliente, cliente_id=cliente_id)
+    # Render normal + cookie para que no se pierda el cliente_id aunque el link venga “pelado”
+    resp = make_response(render_template("index.html", servicios=servicios, citas=citas_cliente, cliente_id=cliente_id))
+    resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)  # 1 año
+    return resp
 
 
 @app.route("/cancelar", methods=["POST"])
 def cancelar():
-    # ✅ tu index.html manda: id
     id_cita = request.form.get("id")
     if not id_cita:
         flash("Error: no se recibió el ID de la cita")
         return redirect(url_for("index"))
 
-    # 1) Buscar detalles para mandar mensajes
     cita = buscar_cita_por_id(id_cita)
     if not cita:
         flash("No se encontró la cita")
         return redirect(url_for("index"))
 
-    # 2) Cancelar en DB/TXT
     cancelar_cita_por_id(id_cita)
 
     cliente = cita.get("cliente", "")
@@ -413,7 +414,6 @@ def cancelar():
     fecha = cita.get("fecha", "")
     hora = cita.get("hora", "")
 
-    # WhatsApp barbero
     msg_barbero = f"""❌ Cita CANCELADA
 
 Cliente: {cliente}
@@ -423,7 +423,6 @@ Hora: {hora}
 """
     enviar_whatsapp(NUMERO_BARBERO, msg_barbero)
 
-    # WhatsApp cliente si es número real
     if es_numero_whatsapp(cliente_id):
         msg_cliente = f"""❌ Tu cita fue cancelada
 
@@ -436,7 +435,9 @@ Si deseas agendar de nuevo, entra al link.
         enviar_whatsapp(cliente_id, msg_cliente)
 
     flash("Cita cancelada correctamente")
-    return redirect(url_for("index", cliente_id=cliente_id))
+    resp = make_response(redirect(url_for("index", cliente_id=cliente_id)))
+    resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
+    return resp
 
 
 @app.route("/barbero")
@@ -461,8 +462,6 @@ def horas():
         return jsonify([])
 
     citas = leer_citas()
-
-    # ✅ Ocupadas (NO canceladas)
     ocupadas = [
         c["hora"] for c in citas
         if c["barbero"] == barbero and c["fecha"] == fecha and c["servicio"] != "CITA CANCELADA"
@@ -474,6 +473,7 @@ def horas():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
