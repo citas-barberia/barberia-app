@@ -3,6 +3,7 @@ from datetime import date
 import os
 import uuid
 import requests
+import time  # ✅ NUEVO (para anti-duplicados del webhook)
 
 app = Flask(__name__)
 app.secret_key = "secret_key"
@@ -16,6 +17,12 @@ DOMINIO = os.getenv("DOMINIO", "https://barberia-app-1.onrender.com")
 
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
+
+# =========================
+# ✅ Anti-duplicados webhook
+# =========================
+PROCESADOS = {}  # {message_id: timestamp}
+TTL_MSG = 60 * 10  # 10 minutos
 
 
 def enviar_whatsapp(to_numero: str, mensaje: str) -> bool:
@@ -285,12 +292,30 @@ def webhook():
         return "Token incorrecto", 403
 
     data = request.get_json()
+
     try:
         value = data["entry"][0]["changes"][0]["value"]
+
+        # ✅ Ignorar eventos que NO son mensajes
         if "messages" not in value:
             return "ok", 200
 
-        numero = value["messages"][0]["from"]
+        msg = value["messages"][0]
+        numero = msg.get("from")
+        msg_id = msg.get("id")  # ✅ ID único del mensaje
+
+        # ✅ limpiar viejos (para que no crezca infinito)
+        ahora = time.time()
+        for k, t in list(PROCESADOS.items()):
+            if ahora - t > TTL_MSG:
+                PROCESADOS.pop(k, None)
+
+        # ✅ Si ya lo procesamos, no respondemos otra vez
+        if msg_id and msg_id in PROCESADOS:
+            return "ok", 200
+
+        if msg_id:
+            PROCESADOS[msg_id] = ahora
 
         # Link con cliente_id
         link = f"{DOMINIO}/?cliente_id={numero}"
@@ -303,6 +328,7 @@ Para agendar tu cita entra aquí:
 (Guarda este link para cancelar luego)
 """
         enviar_whatsapp(numero, mensaje)
+
     except Exception as e:
         print("Error webhook:", e)
 
@@ -388,7 +414,6 @@ Para cancelar: entra a este link:
         resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)  # 1 año
         return resp
 
-    # Render normal + cookie para que no se pierda el cliente_id aunque el link venga “pelado”
     resp = make_response(render_template("index.html", servicios=servicios, citas=citas_cliente, cliente_id=cliente_id))
     resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)  # 1 año
     return resp
