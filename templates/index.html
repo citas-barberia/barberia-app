@@ -54,7 +54,8 @@ async function actualizarHoras() {
 
     if(!fecha || !barbero) return;
 
-    const res = await fetch(`/horas?fecha=${fecha}&barbero=${barbero}`);
+    const res = await fetch(`/horas?fecha=${encodeURIComponent(fecha)}&barbero=${encodeURIComponent(barbero)}&t=${Date.now()}`);
+
     const horas = await res.json();
 
     selectHora.innerHTML = "";

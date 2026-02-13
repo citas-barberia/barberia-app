@@ -3,7 +3,7 @@ from datetime import date
 import os
 import uuid
 import requests
-import time  # ✅ NUEVO (para anti-duplicados del webhook)
+import time  # anti-duplicados webhook
 
 app = Flask(__name__)
 app.secret_key = "secret_key"
@@ -19,14 +19,29 @@ WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
 
 # =========================
-# ✅ Anti-duplicados webhook
+# Anti-duplicados webhook
 # =========================
 PROCESADOS = {}  # {message_id: timestamp}
 TTL_MSG = 60 * 10  # 10 minutos
 
 
+# =========================
+# Helpers
+# =========================
+def normalizar_barbero(barbero: str) -> str:
+    """
+    Evita choques por escribir distinto:
+    ' jose  ' -> 'Jose'
+    'JOSE' -> 'Jose'
+    'José' se mantiene como 'José' si lo escriben así.
+    """
+    if not barbero:
+        return ""
+    barbero = " ".join(barbero.strip().split())  # quita espacios dobles
+    return barbero.title()
+
+
 def enviar_whatsapp(to_numero: str, mensaje: str) -> bool:
-    """Envía un WhatsApp por Cloud API."""
     if not WHATSAPP_TOKEN or not PHONE_NUMBER_ID:
         print("⚠️ Faltan WHATSAPP_TOKEN o PHONE_NUMBER_ID en variables de entorno")
         return False
@@ -55,7 +70,6 @@ def enviar_whatsapp(to_numero: str, mensaje: str) -> bool:
 
 
 def es_numero_whatsapp(valor: str) -> bool:
-    """True si parece un número tipo 506xxxxxxx (solo dígitos)."""
     if not valor:
         return False
     s = str(valor).strip()
@@ -72,7 +86,6 @@ servicios = {
     "Solo cejas": 2000,
 }
 
-# Mantener horas “latinas”
 HORAS_BASE = ["09:00am", "10:00am", "11:00am", "12:00md", "1:00pm", "2:00pm", "3:00pm", "4:00pm", "5:00pm"]
 
 
@@ -99,10 +112,7 @@ else:
 
 
 # ==========================================================
-#  RESPALDO TXT
-#  Soporta:
-#   - Viejo: cliente|cliente_id|barbero|servicio|precio|fecha|hora  (7 campos)
-#   - Nuevo: id|cliente|cliente_id|barbero|servicio|precio|fecha|hora (8 campos)
+# RESPALDO TXT
 # ==========================================================
 def leer_citas_txt():
     citas = []
@@ -113,7 +123,6 @@ def leer_citas_txt():
                     continue
                 c = linea.strip().split("|")
 
-                # Formato nuevo (8)
                 if len(c) == 8:
                     id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora = c
                     citas.append({
@@ -128,7 +137,6 @@ def leer_citas_txt():
                     })
                     continue
 
-                # Formato viejo (7)
                 if len(c) == 7:
                     cliente, cliente_id, barbero, servicio, precio, fecha, hora = c
                     citas.append({
@@ -155,7 +163,6 @@ def guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fe
 
 
 def cancelar_cita_txt_por_id(id_cita):
-    """Marca como CITA CANCELADA por ID."""
     citas = leer_citas_txt()
     with open("citas.txt", "w", encoding="utf-8") as f:
         for c in citas:
@@ -174,7 +181,7 @@ def buscar_cita_txt_por_id(id_cita):
 
 
 # ==========================================================
-#  SUPABASE DB
+# SUPABASE DB
 # ==========================================================
 def leer_citas_db():
     try:
@@ -247,7 +254,7 @@ def cancelar_cita_db_por_id(id_cita):
 
 
 # ==========================================================
-#  WRAPPERS
+# WRAPPERS
 # ==========================================================
 def leer_citas():
     return leer_citas_db() if USAR_SUPABASE else leer_citas_txt()
@@ -296,30 +303,26 @@ def webhook():
     try:
         value = data["entry"][0]["changes"][0]["value"]
 
-        # ✅ Ignorar eventos que NO son mensajes
+        # Ignorar eventos que NO son mensajes
         if "messages" not in value:
             return "ok", 200
 
         msg = value["messages"][0]
         numero = msg.get("from")
-        msg_id = msg.get("id")  # ✅ ID único del mensaje
+        msg_id = msg.get("id")
 
-        # ✅ limpiar viejos (para que no crezca infinito)
+        # limpiar viejos
         ahora = time.time()
         for k, t in list(PROCESADOS.items()):
             if ahora - t > TTL_MSG:
                 PROCESADOS.pop(k, None)
 
-        # ✅ Si ya lo procesamos, no respondemos otra vez
         if msg_id and msg_id in PROCESADOS:
             return "ok", 200
-
         if msg_id:
             PROCESADOS[msg_id] = ahora
 
-        # Link con cliente_id
         link = f"{DOMINIO}/?cliente_id={numero}"
-
         mensaje = f"""Hola 👋 Bienvenido a Barbería José 💈
 
 Para agendar tu cita entra aquí:
@@ -340,7 +343,6 @@ Para agendar tu cita entra aquí:
 # =========================
 @app.route("/", methods=["GET", "POST"])
 def index():
-    # 1) Si viene por URL, úsalo y guárdalo en cookie
     cliente_id_url = request.args.get("cliente_id")
     cliente_id_cookie = request.cookies.get("cliente_id")
 
@@ -352,31 +354,39 @@ def index():
         cliente_id = str(uuid.uuid4())
 
     citas_todas = leer_citas()
+
+    # cliente solo ve sus citas
     citas_cliente = [c for c in citas_todas if str(c.get("cliente_id", "")) == str(cliente_id)]
 
     if request.method == "POST":
         cliente = request.form.get("cliente", "").strip()
-        barbero = request.form.get("barbero", "").strip()
+        barbero_raw = request.form.get("barbero", "").strip()
         servicio = request.form.get("servicio", "").strip()
         fecha = request.form.get("fecha", "").strip()
         hora = request.form.get("hora", "").strip()
 
-        # Si el form manda cliente_id (por si acaso), respétalo
         cliente_id_form = request.form.get("cliente_id")
         if cliente_id_form:
             cliente_id = str(cliente_id_form).strip()
 
+        # ✅ normalizamos barbero para que siempre compare igual
+        barbero = normalizar_barbero(barbero_raw)
+
         precio = str(servicios.get(servicio, 0))
 
+        # ✅ Conflicto comparando con normalización (arregla choques por “Jose” vs “ José ”)
         conflict = any(
-            c["barbero"] == barbero and c["fecha"] == fecha and c["hora"] == hora and c["servicio"] != "CITA CANCELADA"
+            normalizar_barbero(c.get("barbero", "")) == barbero
+            and str(c.get("fecha", "")) == fecha
+            and str(c.get("hora", "")) == hora
+            and c.get("servicio") != "CITA CANCELADA"
             for c in citas_todas
         )
 
         if conflict:
             flash("La hora seleccionada ya está ocupada. Por favor elige otra.")
             resp = make_response(redirect(url_for("index", cliente_id=cliente_id)))
-            resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)  # 1 año
+            resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
             return resp
 
         id_cita = str(uuid.uuid4())
@@ -411,11 +421,11 @@ Para cancelar: entra a este link:
 
         flash("Cita agendada exitosamente")
         resp = make_response(redirect(url_for("index", cliente_id=cliente_id)))
-        resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)  # 1 año
+        resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
         return resp
 
     resp = make_response(render_template("index.html", servicios=servicios, citas=citas_cliente, cliente_id=cliente_id))
-    resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)  # 1 año
+    resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
     return resp
 
 
@@ -486,10 +496,15 @@ def horas():
     if not fecha or not barbero:
         return jsonify([])
 
+    # ✅ normalizamos barbero igual que arriba
+    barbero_norm = normalizar_barbero(barbero)
+
     citas = leer_citas()
     ocupadas = [
-        c["hora"] for c in citas
-        if c["barbero"] == barbero and c["fecha"] == fecha and c["servicio"] != "CITA CANCELADA"
+        c.get("hora") for c in citas
+        if normalizar_barbero(c.get("barbero", "")) == barbero_norm
+        and str(c.get("fecha", "")) == str(fecha)
+        and c.get("servicio") != "CITA CANCELADA"
     ]
 
     disponibles = [h for h in HORAS_BASE if h not in ocupadas]
