@@ -15,6 +15,9 @@ VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "barberia123")
 NUMERO_BARBERO = os.getenv("NUMERO_BARBERO", "50672314147")
 DOMINIO = os.getenv("DOMINIO", "https://barberia-app-1.onrender.com")
 
+# ✅ NUEVO: nombre del barbero (Ericson)
+NOMBRE_BARBERO = os.getenv("NOMBRE_BARBERO", "Ericson")
+
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
 
@@ -31,9 +34,8 @@ TTL_MSG = 60 * 10  # 10 minutos
 def normalizar_barbero(barbero: str) -> str:
     """
     Evita choques por escribir distinto:
-    ' jose  ' -> 'Jose'
-    'JOSE' -> 'Jose'
-    'José' se mantiene como 'José' si lo escriben así.
+    ' ericson  ' -> 'Ericson'
+    'ERICSON' -> 'Ericson'
     """
     if not barbero:
         return ""
@@ -323,7 +325,9 @@ def webhook():
             PROCESADOS[msg_id] = ahora
 
         link = f"{DOMINIO}/?cliente_id={numero}"
-        mensaje = f"""Hola 👋 Bienvenido a Barbería José 💈
+
+        # ✅ Mensaje con nombre real del barbero (Ericson)
+        mensaje = f"""Hola 👋 Bienvenido a Barbería {NOMBRE_BARBERO} 💈
 
 Para agendar tu cita entra aquí:
 {link}
@@ -360,6 +364,8 @@ def index():
 
     if request.method == "POST":
         cliente = request.form.get("cliente", "").strip()
+
+        # ✅ Barbero viene fijo desde HTML, pero igual lo normalizamos
         barbero_raw = request.form.get("barbero", "").strip()
         servicio = request.form.get("servicio", "").strip()
         fecha = request.form.get("fecha", "").strip()
@@ -369,12 +375,11 @@ def index():
         if cliente_id_form:
             cliente_id = str(cliente_id_form).strip()
 
-        # ✅ normalizamos barbero para que siempre compare igual
         barbero = normalizar_barbero(barbero_raw)
 
         precio = str(servicios.get(servicio, 0))
 
-        # ✅ Conflicto comparando con normalización (arregla choques por “Jose” vs “ José ”)
+        # ✅ Conflicto comparando con normalización
         conflict = any(
             normalizar_barbero(c.get("barbero", "")) == barbero
             and str(c.get("fecha", "")) == fecha
@@ -405,7 +410,9 @@ Precio: ₡{precio}
 
         if es_numero_whatsapp(cliente_id):
             link = f"{DOMINIO}/?cliente_id={cliente_id}"
-            msg_cliente = f"""✅ Cita confirmada 💈
+
+            # ✅ Mensaje con nombre real del barbero
+            msg_cliente = f"""✅ Cita confirmada en Barbería {NOMBRE_BARBERO} 💈
 
 Cliente: {cliente}
 Barbero: {barbero}
@@ -424,7 +431,15 @@ Para cancelar: entra a este link:
         resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
         return resp
 
-    resp = make_response(render_template("index.html", servicios=servicios, citas=citas_cliente, cliente_id=cliente_id))
+    # ✅ Pasamos nombre y número al HTML
+    resp = make_response(render_template(
+        "index.html",
+        servicios=servicios,
+        citas=citas_cliente,
+        cliente_id=cliente_id,
+        numero_barbero=NUMERO_BARBERO,
+        nombre_barbero=NOMBRE_BARBERO
+    ))
     resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
     return resp
 
@@ -459,7 +474,8 @@ Hora: {hora}
     enviar_whatsapp(NUMERO_BARBERO, msg_barbero)
 
     if es_numero_whatsapp(cliente_id):
-        msg_cliente = f"""❌ Tu cita fue cancelada
+        # ✅ Mensaje con nombre real del barbero
+        msg_cliente = f"""❌ Tu cita en Barbería {NOMBRE_BARBERO} fue cancelada
 
 Barbero: {barbero}
 Fecha: {fecha}
@@ -496,7 +512,6 @@ def horas():
     if not fecha or not barbero:
         return jsonify([])
 
-    # ✅ normalizamos barbero igual que arriba
     barbero_norm = normalizar_barbero(barbero)
 
     citas = leer_citas()

@@ -24,7 +24,7 @@ tr:nth-child(even) { background: #262626; }
 tr:nth-child(odd) { background: #2b2b2b; }
 tr:hover { background: #D4AF3733; }
 
-/* ✅ BOTÓN WHATSAPP (ARREGLADO SIN ROMPER DISEÑO) */
+/* ✅ BOTÓN WHATSAPP */
 .btn-whatsapp {
     display: inline-block;
     background: #25D366;
@@ -55,7 +55,6 @@ async function actualizarHoras() {
     if(!fecha || !barbero) return;
 
     const res = await fetch(`/horas?fecha=${encodeURIComponent(fecha)}&barbero=${encodeURIComponent(barbero)}&t=${Date.now()}`);
-
     const horas = await res.json();
 
     selectHora.innerHTML = "";
@@ -63,6 +62,7 @@ async function actualizarHoras() {
     if(horas.length === 0){
         const option = document.createElement("option");
         option.text = "No hay horas disponibles";
+        option.value = "";
         selectHora.appendChild(option);
         return;
     }
@@ -80,12 +80,14 @@ window.addEventListener("DOMContentLoaded", () => {
     const fechaInput = document.getElementById("fecha");
     const today = new Date();
 
+    const year = today.getFullYear();
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
 
-    fechaInput.value = `2026-${month}-${day}`;
-    fechaInput.min = "2026-01-01";
-    fechaInput.max = "2026-12-31";
+    fechaInput.value = `${year}-${month}-${day}`;
+    fechaInput.min = `${year}-01-01`;
+    fechaInput.max = `${year}-12-31`;
+
     actualizarHoras();
 
 });
@@ -97,7 +99,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
 <div class="container">
 
-<h1>Agendar Cita - Barbería</h1>
+<!-- ✅ Título personalizado -->
+<h1>Agenda tu cita con {{ nombre_barbero }} 💈</h1>
 
 {% with messages = get_flashed_messages() %}
 {% if messages %}
@@ -111,11 +114,17 @@ window.addEventListener("DOMContentLoaded", () => {
 
 <form method="POST">
 
- <input type="hidden" name="cliente_id" value="{{ cliente_id }}">   
+ <input type="hidden" name="cliente_id" value="{{ cliente_id }}">
 
 <input type="text" name="cliente" placeholder="Tu nombre" required>
 
-<input type="text" name="barbero" id="barbero" placeholder="Nombre del barbero" oninput="actualizarHoras()" required>
+<!-- ✅ Barbero fijo (Ericson) -->
+<input type="text"
+       name="barbero"
+       id="barbero"
+       value="{{ nombre_barbero }}"
+       readonly
+       required>
 
 <select name="servicio" required>
 <option value="">Seleccione un servicio</option>
@@ -161,20 +170,16 @@ window.addEventListener("DOMContentLoaded", () => {
 {% if c.servicio != "CITA CANCELADA" %}
 <form method="POST" action="{{ url_for('cancelar') }}">
     <input type="hidden" name="id" value="{{ c.id }}">
-    <input type="hidden" name="cliente" value="{{ c.cliente }}">
-    <input type="hidden" name="cliente_id" value="{{ c.cliente_id }}">
-    <input type="hidden" name="barbero" value="{{ c.barbero }}">
-    <input type="hidden" name="fecha" value="{{ c.fecha }}">
-    <input type="hidden" name="hora" value="{{ c.hora }}">
     <button type="submit">Cancelar</button>
 </form>
 {% endif %}
 </td>
 
-
 <td>
 {% if c.servicio != "CITA CANCELADA" %}
-<a class="btn-whatsapp" href="https://wa.me/50672314147" target="_blank">
+<a class="btn-whatsapp"
+   href="https://wa.me/{{ numero_barbero }}?text=Hola%20vengo%20por%20la%20cita%20de%20la%20barber%C3%ADa"
+   target="_blank">
  WhatsApp
 </a>
 {% endif %}
@@ -189,5 +194,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
