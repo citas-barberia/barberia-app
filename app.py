@@ -81,6 +81,18 @@ def barbero_autenticado() -> bool:
     return request.cookies.get("clave_barbero") == CLAVE_BARBERO
 
 
+def _precio_a_int(valor):
+    """✅ Convierte precio a int aunque venga como '₡5000' o '5000' o None."""
+    if valor is None:
+        return 0
+    s = str(valor)
+    s = s.replace("₡", "").replace(",", "").strip()
+    try:
+        return int(float(s))
+    except:
+        return 0
+
+
 # =========================
 # Servicios y horas
 # =========================
@@ -563,35 +575,56 @@ def _render_panel_barbero():
     hoy = date.today().strftime("%Y-%m-%d")
     manana = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
 
-    # filtro por fecha
+    # ===== filtro por fecha =====
     if solo == "hoy":
-        citas = [c for c in citas if str(c.get("fecha")) == hoy]
+        citas_dia = [c for c in citas if str(c.get("fecha")) == hoy]
     elif solo == "manana":
-        citas = [c for c in citas if str(c.get("fecha")) == manana]
-    # todas -> no filtra
+        citas_dia = [c for c in citas if str(c.get("fecha")) == manana]
+    else:
+        citas_dia = list(citas)
 
-    # filtro por estado
+    # ===== métricas del día =====
+    cant_total = len(citas_dia)
+    cant_canceladas = sum(1 for c in citas_dia if c.get("servicio") == "CITA CANCELADA")
+    cant_atendidas = sum(1 for c in citas_dia if c.get("servicio") == "CITA ATENDIDA")
+    cant_activas = sum(1 for c in citas_dia if c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"])
+
+    total_atendido = sum(
+        _precio_a_int(c.get("precio"))
+        for c in citas_dia
+        if c.get("servicio") == "CITA ATENDIDA"
+    )
+
+    stats = {
+        "cant_total": cant_total,
+        "cant_activas": cant_activas,
+        "cant_atendidas": cant_atendidas,
+        "cant_canceladas": cant_canceladas,
+        "total_atendido": total_atendido,
+        "solo": solo
+    }
+
+    # ===== aplicar filtros a la tabla =====
+    citas_filtradas = list(citas_dia)
+
     if estado == "activas":
-        citas = [c for c in citas if c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]]
+        citas_filtradas = [c for c in citas_filtradas if c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]]
     elif estado == "canceladas":
-        citas = [c for c in citas if c.get("servicio") == "CITA CANCELADA"]
+        citas_filtradas = [c for c in citas_filtradas if c.get("servicio") == "CITA CANCELADA"]
     elif estado == "atendidas":
-        citas = [c for c in citas if c.get("servicio") == "CITA ATENDIDA"]
+        citas_filtradas = [c for c in citas_filtradas if c.get("servicio") == "CITA ATENDIDA"]
     # todas -> no filtra
 
-    # búsqueda
     if q:
-        citas = [
-            c for c in citas
+        citas_filtradas = [
+            c for c in citas_filtradas
             if q in str(c.get("cliente", "")).lower()
             or q in str(c.get("servicio", "")).lower()
         ]
 
-    # ordenar
-    citas.sort(key=lambda c: (str(c.get("fecha", "")), str(c.get("hora", ""))))
+    citas_filtradas.sort(key=lambda c: (str(c.get("fecha", "")), str(c.get("hora", ""))))
 
-    fecha_actual = hoy
-    return render_template("barbero.html", citas=citas, fecha_actual=fecha_actual)
+    return render_template("barbero.html", citas=citas_filtradas, fecha_actual=hoy, stats=stats)
 
 
 @app.route("/citas_json")
@@ -624,6 +657,7 @@ def horas():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 

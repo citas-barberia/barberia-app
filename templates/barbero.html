@@ -7,12 +7,24 @@
 <style>
 *{box-sizing:border-box}
 body{font-family:Arial, sans-serif; background:#121212; color:#eee; padding:20px;}
-.box{max-width:1100px; margin:auto; background:#1f1f1f; padding:20px; border-radius:14px;}
+.box{max-width:1150px; margin:auto; background:#1f1f1f; padding:20px; border-radius:14px;}
 h1{margin:0 0 10px; color:#D4AF37;}
 .filters{display:flex; gap:10px; flex-wrap:wrap; margin:15px 0;}
 input, select, button{padding:10px; border-radius:10px; border:1px solid #333; background:#2b2b2b; color:#eee;}
 button{cursor:pointer; background:#D4AF37; color:#111; font-weight:bold;}
-table{width:100%; border-collapse:collapse; margin-top:15px;}
+
+.stats{
+  display:grid;
+  grid-template-columns: repeat(5, minmax(160px, 1fr));
+  gap:10px;
+  margin:10px 0 18px;
+}
+.card{background:#2b2b2b;border:1px solid #333;border-radius:12px;padding:12px;}
+.card .t{font-size:12px; opacity:.8; margin-bottom:6px;}
+.card .v{font-size:20px; font-weight:bold;}
+.money{color:#7CFF7C;}
+
+table{width:100%; border-collapse:collapse; margin-top:10px;}
 th,td{padding:10px; border-bottom:1px solid #333; text-align:left;}
 th{color:#D4AF37;}
 .tag{padding:4px 8px; border-radius:999px; font-size:12px; display:inline-block;}
@@ -26,6 +38,17 @@ th{color:#D4AF37;}
 <div class="box">
 
 <h1>Panel de Ericson 💈</h1>
+
+<div class="stats">
+  <div class="card">
+    <div class="t">Citas ({{ "Hoy" if stats.solo=="hoy" else ("Mañana" if stats.solo=="manana" else "Todas") }})</div>
+    <div class="v">{{ stats.cant_total }}</div>
+  </div>
+  <div class="card"><div class="t">Activas</div><div class="v">{{ stats.cant_activas }}</div></div>
+  <div class="card"><div class="t">Atendidas</div><div class="v">{{ stats.cant_atendidas }}</div></div>
+  <div class="card"><div class="t">Canceladas</div><div class="v">{{ stats.cant_canceladas }}</div></div>
+  <div class="card"><div class="t">Total cobrado (Atendidas)</div><div class="v money">₡{{ stats.total_atendido }}</div></div>
+</div>
 
 <form method="GET" class="filters">
   <select name="solo">
@@ -48,13 +71,7 @@ th{color:#D4AF37;}
 <table>
 <thead>
 <tr>
-  <th>Fecha</th>
-  <th>Hora</th>
-  <th>Cliente</th>
-  <th>Servicio</th>
-  <th>Precio</th>
-  <th>Estado</th>
-  <th>Acción</th>
+  <th>Fecha</th><th>Hora</th><th>Cliente</th><th>Servicio</th><th>Precio</th><th>Estado</th><th>Acción</th>
 </tr>
 </thead>
 
@@ -104,3 +121,4 @@ if (q) document.querySelector('input[name="q"]').value = q;
 
 </body>
 </html>
+
