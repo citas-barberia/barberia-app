@@ -12,6 +12,7 @@ h1{margin:0 0 10px; color:#D4AF37;}
 .filters{display:flex; gap:10px; flex-wrap:wrap; margin:15px 0;}
 input, select, button{padding:10px; border-radius:10px; border:1px solid #333; background:#2b2b2b; color:#eee;}
 button{cursor:pointer; background:#D4AF37; color:#111; font-weight:bold;}
+.small{opacity:.8; font-size:12px; margin-top:6px;}
 
 .stats{
   display:grid;
@@ -39,43 +40,47 @@ th{color:#D4AF37;}
 
 <h1>Panel de Ericson 💈</h1>
 
+<!-- ✅ CONTADORES -->
 <div class="stats">
   <div class="card">
-    <div class="t">Citas ({{ "Hoy" if stats.solo=="hoy" else ("Mañana" if stats.solo=="manana" else "Todas") }})</div>
-    <div class="v">{{ stats.cant_total }}</div>
+    <div class="t" id="t_citas">Citas</div>
+    <div class="v" id="v_total">{{ stats.cant_total }}</div>
   </div>
-  <div class="card"><div class="t">Activas</div><div class="v">{{ stats.cant_activas }}</div></div>
-  <div class="card"><div class="t">Atendidas</div><div class="v">{{ stats.cant_atendidas }}</div></div>
-  <div class="card"><div class="t">Canceladas</div><div class="v">{{ stats.cant_canceladas }}</div></div>
-  <div class="card"><div class="t">Total cobrado (Atendidas)</div><div class="v money">₡{{ stats.total_atendido }}</div></div>
+  <div class="card"><div class="t">Activas</div><div class="v" id="v_activas">{{ stats.cant_activas }}</div></div>
+  <div class="card"><div class="t">Atendidas</div><div class="v" id="v_atendidas">{{ stats.cant_atendidas }}</div></div>
+  <div class="card"><div class="t">Canceladas</div><div class="v" id="v_canceladas">{{ stats.cant_canceladas }}</div></div>
+  <div class="card"><div class="t">Total cobrado (Atendidas)</div><div class="v money" id="v_total_cobrado">₡{{ stats.total_atendido }}</div></div>
 </div>
 
-<form method="GET" class="filters">
-  <select name="solo">
+<!-- ✅ FILTROS -->
+<form class="filters" onsubmit="event.preventDefault(); cargarCitas(true);">
+  <select name="solo" id="solo">
     <option value="hoy">Hoy</option>
     <option value="manana">Mañana</option>
     <option value="todas">Todas</option>
   </select>
 
-  <select name="estado">
+  <select name="estado" id="estado">
     <option value="activas">Activas</option>
     <option value="atendidas">Atendidas</option>
     <option value="canceladas">Canceladas</option>
     <option value="todas">Todas</option>
   </select>
 
-  <input name="q" placeholder="Buscar cliente/servicio" />
+  <input id="q" placeholder="Buscar cliente/servicio" />
   <button type="submit">Aplicar</button>
 </form>
 
+<div class="small" id="last_update">Actualizando…</div>
+
+<!-- ✅ TABLA -->
 <table>
 <thead>
 <tr>
   <th>Fecha</th><th>Hora</th><th>Cliente</th><th>Servicio</th><th>Precio</th><th>Estado</th><th>Acción</th>
 </tr>
 </thead>
-
-<tbody>
+<tbody id="tbody">
 {% for c in citas %}
 <tr>
   <td>{{ c.fecha }}</td>
@@ -83,7 +88,6 @@ th{color:#D4AF37;}
   <td>{{ c.cliente }}</td>
   <td>{{ c.servicio }}</td>
   <td>₡{{ c.precio }}</td>
-
   <td>
     {% if c.servicio == "CITA CANCELADA" %}
       <span class="tag bad">Cancelada</span>
@@ -93,7 +97,6 @@ th{color:#D4AF37;}
       <span class="tag ok">Activa</span>
     {% endif %}
   </td>
-
   <td>
     {% if c.servicio not in ["CITA CANCELADA","CITA ATENDIDA"] %}
       <form method="POST" action="/atendida">
@@ -110,15 +113,165 @@ th{color:#D4AF37;}
 </div>
 
 <script>
-const params = new URLSearchParams(window.location.search);
-const solo = params.get("solo");
-const estado = params.get("estado");
-if (solo) document.querySelector('select[name="solo"]').value = solo;
-if (estado) document.querySelector('select[name="estado"]').value = estado;
-const q = params.get("q");
-if (q) document.querySelector('input[name="q"]').value = q;
+function precioAInt(p){
+  if(p === null || p === undefined) return 0;
+  return parseInt(String(p).replace("₡","").replaceAll(",","").trim() || "0", 10) || 0;
+}
+
+function aplicarFiltros(citas){
+  const solo = document.getElementById("solo").value;
+  const estado = document.getElementById("estado").value;
+  const q = (document.getElementById("q").value || "").trim().toLowerCase();
+
+  const hoy = new Date();
+  const yyyy = hoy.getFullYear();
+  const mm = String(hoy.getMonth()+1).padStart(2,"0");
+  const dd = String(hoy.getDate()).padStart(2,"0");
+  const hoyStr = `${yyyy}-${mm}-${dd}`;
+
+  const manana = new Date(hoy);
+  manana.setDate(hoy.getDate()+1);
+  const my = manana.getFullYear();
+  const mmm = String(manana.getMonth()+1).padStart(2,"0");
+  const mdd = String(manana.getDate()).padStart(2,"0");
+  const mananaStr = `${my}-${mmm}-${mdd}`;
+
+  let base = [...citas];
+
+  // fecha
+  if(solo === "hoy") base = base.filter(c => String(c.fecha) === hoyStr);
+  if(solo === "manana") base = base.filter(c => String(c.fecha) === mananaStr);
+
+  // estado
+  if(estado === "activas") base = base.filter(c => !["CITA CANCELADA","CITA ATENDIDA"].includes(c.servicio));
+  if(estado === "canceladas") base = base.filter(c => c.servicio === "CITA CANCELADA");
+  if(estado === "atendidas") base = base.filter(c => c.servicio === "CITA ATENDIDA");
+
+  // búsqueda
+  if(q){
+    base = base.filter(c =>
+      String(c.cliente||"").toLowerCase().includes(q) ||
+      String(c.servicio||"").toLowerCase().includes(q)
+    );
+  }
+
+  // ordenar
+  base.sort((a,b) => {
+    const k1 = String(a.fecha).localeCompare(String(b.fecha));
+    if(k1 !== 0) return k1;
+    return String(a.hora).localeCompare(String(b.hora));
+  });
+
+  return { base, hoyStr, mananaStr };
+}
+
+function renderTabla(citas){
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+
+  citas.forEach(c => {
+    const tr = document.createElement("tr");
+
+    const estado = c.servicio === "CITA CANCELADA" ? "Cancelada"
+                : c.servicio === "CITA ATENDIDA" ? "Atendida"
+                : "Activa";
+
+    const tagClass = c.servicio === "CITA CANCELADA" ? "bad"
+                  : c.servicio === "CITA ATENDIDA" ? "done"
+                  : "ok";
+
+    tr.innerHTML = `
+      <td>${c.fecha}</td>
+      <td>${c.hora}</td>
+      <td>${c.cliente || ""}</td>
+      <td>${c.servicio || ""}</td>
+      <td>₡${c.precio || 0}</td>
+      <td><span class="tag ${tagClass}">${estado}</span></td>
+      <td>
+        ${
+          (!["CITA CANCELADA","CITA ATENDIDA"].includes(c.servicio)) ?
+          `<form method="POST" action="/atendida">
+              <input type="hidden" name="id" value="${c.id}">
+              <button type="submit">Marcar atendida</button>
+            </form>`
+          : ""
+        }
+      </td>
+    `;
+
+    tbody.appendChild(tr);
+  });
+}
+
+function actualizarStats(citasDia, solo){
+  const cant_total = citasDia.length;
+  const cant_canceladas = citasDia.filter(c => c.servicio === "CITA CANCELADA").length;
+  const cant_atendidas = citasDia.filter(c => c.servicio === "CITA ATENDIDA").length;
+  const cant_activas = citasDia.filter(c => !["CITA CANCELADA","CITA ATENDIDA"].includes(c.servicio)).length;
+  const total_atendido = citasDia
+    .filter(c => c.servicio === "CITA ATENDIDA")
+    .reduce((acc, c) => acc + precioAInt(c.precio), 0);
+
+  document.getElementById("v_total").textContent = cant_total;
+  document.getElementById("v_activas").textContent = cant_activas;
+  document.getElementById("v_atendidas").textContent = cant_atendidas;
+  document.getElementById("v_canceladas").textContent = cant_canceladas;
+  document.getElementById("v_total_cobrado").textContent = "₡" + total_atendido;
+
+  const t = solo === "hoy" ? "Citas (Hoy)"
+        : solo === "manana" ? "Citas (Mañana)"
+        : "Citas (Todas)";
+  document.getElementById("t_citas").textContent = t;
+}
+
+async function cargarCitas(guardarParams=false){
+  try{
+    const res = await fetch(`/citas_json?t=${Date.now()}`);
+    const data = await res.json();
+    const citas = data.citas || [];
+
+    const solo = document.getElementById("solo").value;
+    const { base, hoyStr, mananaStr } = aplicarFiltros(citas);
+
+    // stats del “día” según solo (hoy/mañana/todas)
+    let citasDia = [...citas];
+    if(solo === "hoy") citasDia = citas.filter(c => String(c.fecha) === hoyStr);
+    if(solo === "manana") citasDia = citas.filter(c => String(c.fecha) === mananaStr);
+
+    actualizarStats(citasDia, solo);
+    renderTabla(base);
+
+    document.getElementById("last_update").textContent = "Última actualización: " + new Date().toLocaleTimeString();
+
+    if(guardarParams){
+      const params = new URLSearchParams(window.location.search);
+      params.set("solo", document.getElementById("solo").value);
+      params.set("estado", document.getElementById("estado").value);
+      params.set("q", document.getElementById("q").value || "");
+      history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+    }
+  }catch(e){
+    document.getElementById("last_update").textContent = "No se pudo actualizar (revisa internet).";
+  }
+}
+
+// ✅ cargar filtros desde URL al abrir
+(function(){
+  const params = new URLSearchParams(window.location.search);
+  const solo = params.get("solo");
+  const estado = params.get("estado");
+  const q = params.get("q");
+  if(solo) document.getElementById("solo").value = solo;
+  if(estado) document.getElementById("estado").value = estado;
+  if(q) document.getElementById("q").value = q;
+})();
+
+// ✅ primera carga + auto refresh
+cargarCitas(false);
+setInterval(() => cargarCitas(false), 5000);
 </script>
 
 </body>
 </html>
+
 
