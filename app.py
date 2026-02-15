@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, flash, url_for, jsonify, make_response
-from datetime import date
+from datetime import date, timedelta
 import os
 import uuid
 import requests
@@ -15,8 +15,11 @@ VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "barberia123")
 NUMERO_BARBERO = os.getenv("NUMERO_BARBERO", "50672314147")
 DOMINIO = os.getenv("DOMINIO", "https://barberia-app-1.onrender.com")
 
-# ✅ NUEVO: nombre del barbero (Ericson)
+# ✅ Nombre del barbero (Ericson)
 NOMBRE_BARBERO = os.getenv("NOMBRE_BARBERO", "Ericson")
+
+# ✅ Clave para entrar al panel del barbero
+CLAVE_BARBERO = os.getenv("CLAVE_BARBERO", "1234")
 
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
@@ -32,14 +35,9 @@ TTL_MSG = 60 * 10  # 10 minutos
 # Helpers
 # =========================
 def normalizar_barbero(barbero: str) -> str:
-    """
-    Evita choques por escribir distinto:
-    ' ericson  ' -> 'Ericson'
-    'ERICSON' -> 'Ericson'
-    """
     if not barbero:
         return ""
-    barbero = " ".join(barbero.strip().split())  # quita espacios dobles
+    barbero = " ".join(barbero.strip().split())
     return barbero.title()
 
 
@@ -76,6 +74,11 @@ def es_numero_whatsapp(valor: str) -> bool:
         return False
     s = str(valor).strip()
     return s.isdigit() and len(s) >= 8
+
+
+def barbero_autenticado() -> bool:
+    """✅ Si el barbero ya metió la clave, queda guardada en cookie."""
+    return request.cookies.get("clave_barbero") == CLAVE_BARBERO
 
 
 # =========================
@@ -164,15 +167,23 @@ def guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fe
         f.write(f"{id_cita}|{cliente}|{cliente_id}|{barbero}|{servicio}|{precio}|{fecha}|{hora}\n")
 
 
-def cancelar_cita_txt_por_id(id_cita):
+def _reescribir_citas_txt_actualizando_servicio(id_cita, nuevo_servicio):
     citas = leer_citas_txt()
     with open("citas.txt", "w", encoding="utf-8") as f:
         for c in citas:
-            if c.get("id") == id_cita and c["servicio"] != "CITA CANCELADA":
-                f.write(f"{c.get('id')}|{c['cliente']}|{c['cliente_id']}|{c['barbero']}|CITA CANCELADA|{c['precio']}|{c['fecha']}|{c['hora']}\n")
-            else:
-                cid = c.get("id") or str(uuid.uuid4())
-                f.write(f"{cid}|{c['cliente']}|{c['cliente_id']}|{c['barbero']}|{c['servicio']}|{c['precio']}|{c['fecha']}|{c['hora']}\n")
+            cid = c.get("id") or str(uuid.uuid4())
+            servicio = c.get("servicio")
+            if str(cid) == str(id_cita):
+                servicio = nuevo_servicio
+            f.write(f"{cid}|{c['cliente']}|{c['cliente_id']}|{c['barbero']}|{servicio}|{c['precio']}|{c['fecha']}|{c['hora']}\n")
+
+
+def cancelar_cita_txt_por_id(id_cita):
+    _reescribir_citas_txt_actualizando_servicio(id_cita, "CITA CANCELADA")
+
+
+def marcar_atendida_txt_por_id(id_cita):
+    _reescribir_citas_txt_actualizando_servicio(id_cita, "CITA ATENDIDA")
 
 
 def buscar_cita_txt_por_id(id_cita):
@@ -255,6 +266,15 @@ def cancelar_cita_db_por_id(id_cita):
         return False
 
 
+def marcar_atendida_db_por_id(id_cita):
+    try:
+        supabase.table("citas").update({"servicio": "CITA ATENDIDA"}).eq("id", id_cita).execute()
+        return True
+    except Exception as e:
+        print("Error marcar_atendida_db_por_id:", e)
+        return False
+
+
 # ==========================================================
 # WRAPPERS
 # ==========================================================
@@ -285,6 +305,15 @@ def cancelar_cita_por_id(id_cita):
         if ok:
             return True
     cancelar_cita_txt_por_id(id_cita)
+    return True
+
+
+def marcar_atendida_por_id(id_cita):
+    if USAR_SUPABASE:
+        ok = marcar_atendida_db_por_id(id_cita)
+        if ok:
+            return True
+    marcar_atendida_txt_por_id(id_cita)
     return True
 
 
@@ -326,7 +355,6 @@ def webhook():
 
         link = f"{DOMINIO}/?cliente_id={numero}"
 
-        # ✅ Mensaje con nombre real del barbero (Ericson)
         mensaje = f"""Hola 👋 Bienvenido a Barbería {NOMBRE_BARBERO} 💈
 
 Para agendar tu cita entra aquí:
@@ -365,7 +393,6 @@ def index():
     if request.method == "POST":
         cliente = request.form.get("cliente", "").strip()
 
-        # ✅ Barbero viene fijo desde HTML, pero igual lo normalizamos
         barbero_raw = request.form.get("barbero", "").strip()
         servicio = request.form.get("servicio", "").strip()
         fecha = request.form.get("fecha", "").strip()
@@ -376,10 +403,8 @@ def index():
             cliente_id = str(cliente_id_form).strip()
 
         barbero = normalizar_barbero(barbero_raw)
-
         precio = str(servicios.get(servicio, 0))
 
-        # ✅ Conflicto comparando con normalización
         conflict = any(
             normalizar_barbero(c.get("barbero", "")) == barbero
             and str(c.get("fecha", "")) == fecha
@@ -410,8 +435,6 @@ Precio: ₡{precio}
 
         if es_numero_whatsapp(cliente_id):
             link = f"{DOMINIO}/?cliente_id={cliente_id}"
-
-            # ✅ Mensaje con nombre real del barbero
             msg_cliente = f"""✅ Cita confirmada en Barbería {NOMBRE_BARBERO} 💈
 
 Cliente: {cliente}
@@ -431,7 +454,6 @@ Para cancelar: entra a este link:
         resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
         return resp
 
-    # ✅ Pasamos nombre y número al HTML
     resp = make_response(render_template(
         "index.html",
         servicios=servicios,
@@ -474,7 +496,6 @@ Hora: {hora}
     enviar_whatsapp(NUMERO_BARBERO, msg_barbero)
 
     if es_numero_whatsapp(cliente_id):
-        # ✅ Mensaje con nombre real del barbero
         msg_cliente = f"""❌ Tu cita en Barbería {NOMBRE_BARBERO} fue cancelada
 
 Barbero: {barbero}
@@ -491,10 +512,85 @@ Si deseas agendar de nuevo, entra al link.
     return resp
 
 
-@app.route("/barbero")
+# ✅ Marcar atendida (SOLO BARBERO)
+@app.route("/atendida", methods=["POST"])
+def atendida():
+    if not barbero_autenticado():
+        return redirect(url_for("barbero"))
+
+    id_cita = request.form.get("id")
+    if not id_cita:
+        return redirect(url_for("barbero"))
+
+    marcar_atendida_por_id(id_cita)
+    return redirect(url_for("barbero"))
+
+
+# ✅ Panel del barbero protegido por clave (cookie)
+@app.route("/barbero", methods=["GET"])
 def barbero():
+    clave = request.args.get("clave")
+
+    # Si ya autenticó antes, entra directo
+    if barbero_autenticado():
+        return _render_panel_barbero()
+
+    # Si está metiendo la clave por primera vez
+    if clave == CLAVE_BARBERO:
+        resp = make_response(_render_panel_barbero())
+        resp.set_cookie("clave_barbero", CLAVE_BARBERO, max_age=60 * 60 * 24 * 7)  # 7 días
+        return resp
+
+    # Formulario de clave (cuando no está autenticado)
+    return """
+    <div style='font-family:Arial;max-width:420px;margin:40px auto;padding:20px;border:1px solid #ddd;border-radius:12px;'>
+      <h2>🔒 Panel del barbero</h2>
+      <form method='GET'>
+        <input name='clave' placeholder='Ingrese clave' style='padding:10px;font-size:16px;width:100%;margin:10px 0;'>
+        <button type='submit' style='padding:10px;width:100%;font-size:16px;'>Entrar</button>
+      </form>
+    </div>
+    """
+
+
+def _render_panel_barbero():
     citas = leer_citas()
-    fecha_actual = date.today().strftime("%Y-%m-%d")
+
+    solo = request.args.get("solo", "hoy")          # hoy | manana | todas
+    estado = request.args.get("estado", "activas")  # activas | atendidas | canceladas | todas
+    q = (request.args.get("q") or "").strip().lower()
+
+    hoy = date.today().strftime("%Y-%m-%d")
+    manana = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # filtro por fecha
+    if solo == "hoy":
+        citas = [c for c in citas if str(c.get("fecha")) == hoy]
+    elif solo == "manana":
+        citas = [c for c in citas if str(c.get("fecha")) == manana]
+    # todas -> no filtra
+
+    # filtro por estado
+    if estado == "activas":
+        citas = [c for c in citas if c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]]
+    elif estado == "canceladas":
+        citas = [c for c in citas if c.get("servicio") == "CITA CANCELADA"]
+    elif estado == "atendidas":
+        citas = [c for c in citas if c.get("servicio") == "CITA ATENDIDA"]
+    # todas -> no filtra
+
+    # búsqueda
+    if q:
+        citas = [
+            c for c in citas
+            if q in str(c.get("cliente", "")).lower()
+            or q in str(c.get("servicio", "")).lower()
+        ]
+
+    # ordenar
+    citas.sort(key=lambda c: (str(c.get("fecha", "")), str(c.get("hora", ""))))
+
+    fecha_actual = hoy
     return render_template("barbero.html", citas=citas, fecha_actual=fecha_actual)
 
 
@@ -528,6 +624,7 @@ def horas():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
