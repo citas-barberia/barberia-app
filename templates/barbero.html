@@ -1,279 +1,106 @@
-<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 <title>Panel del Barbero</title>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+
 <style>
-*{margin:0; padding:0; box-sizing:border-box; font-family:'Montserrat',sans-serif;}
-body{background:#121212; color:#f0f0f0;}
-.container{max-width:1000px; margin:40px auto; background:#1f1f1f; padding:40px; border-radius:20px; box-shadow:0 10px 30px rgba(0,0,0,0.5);}
-h1{text-align:center; font-size:2.5rem; margin-bottom:30px; color:#D4AF37; text-shadow:1px 1px 3px #000;}
-.filter{display:flex; justify-content:center; gap:10px; margin-bottom:20px;}
-.filter input[type="date"]{padding:10px; border-radius:8px; border:1px solid #333; background:#2b2b2b; color:#f0f0f0;}
-.filter button{padding:10px 15px; border:none; border-radius:8px; background:#D4AF37; color:#121212; font-weight:bold; cursor:pointer; transition:all 0.3s;}
-.filter button:hover{background:#c29d2f; transform:scale(1.05);}
-table{width:100%; border-collapse:collapse; margin-top:20px; background:#2b2b2b; border-radius:10px; overflow:hidden;}
-th, td{padding:12px; text-align:center;}
-th{background:#333; color:#D4AF37; font-weight:bold;}
-tr:nth-child(even){background:#262626;}
-tr:nth-child(odd){background:#2b2b2b;}
-tr:hover{background:#D4AF3733;}
-.corte{border-left:4px solid #1E90FF;}
-.barba{border-left:4px solid #28a745;}
-.cejas{border-left:4px solid #800080;}
-.today{background:#3a3a3a;}
-.cancelada{background:#2b2b2b; color:#dc3545; font-weight:bold; border-left:4px solid #dc3545;}
-.btn-whatsapp{background:#25D366; color:#fff; text-decoration:none; padding:8px 12px; border-radius:8px; font-weight:bold; transition:all 0.3s;}
-.btn-whatsapp:hover{background:#1ebe57; transform:scale(1.05);}
-@media(max-width:768px){.container{padding:25px;} h1{font-size:2rem;} table,th,td{font-size:14px;} .filter{flex-direction:column; gap:10px;}}
+*{box-sizing:border-box}
+body{font-family:Arial, sans-serif; background:#121212; color:#eee; padding:20px;}
+.box{max-width:1100px; margin:auto; background:#1f1f1f; padding:20px; border-radius:14px;}
+h1{margin:0 0 10px; color:#D4AF37;}
+.filters{display:flex; gap:10px; flex-wrap:wrap; margin:15px 0;}
+input, select, button{padding:10px; border-radius:10px; border:1px solid #333; background:#2b2b2b; color:#eee;}
+button{cursor:pointer; background:#D4AF37; color:#111; font-weight:bold;}
+table{width:100%; border-collapse:collapse; margin-top:15px;}
+th,td{padding:10px; border-bottom:1px solid #333; text-align:left;}
+th{color:#D4AF37;}
+.tag{padding:4px 8px; border-radius:999px; font-size:12px; display:inline-block;}
+.ok{background:#28a745;}
+.bad{background:#dc3545;}
+.done{background:#007bff;}
 </style>
 </head>
+
 <body>
-<div class="container">
-<h1>Panel del Barbero</h1>
+<div class="box">
 
-<!-- Audios de notificación -->
-<audio id="sonidoAgendada" src="{{ url_for('static', filename='sounds/notificacion_agendada.mp3') }}"></audio>
-<audio id="sonidoCancelada" src="{{ url_for('static', filename='sounds/notificacion_cancelada.mp3') }}"></audio>
+<h1>Panel de Ericson 💈</h1>
 
-<!-- Filtro por fecha -->
-<div class="filter">
-<form id="filtroForm">
-<input type="date" name="fecha" id="fechaFiltro">
-<button type="submit">Filtrar</button>
+<form method="GET" class="filters">
+  <select name="solo">
+    <option value="hoy">Hoy</option>
+    <option value="manana">Mañana</option>
+    <option value="todas">Todas</option>
+  </select>
+
+  <select name="estado">
+    <option value="activas">Activas</option>
+    <option value="atendidas">Atendidas</option>
+    <option value="canceladas">Canceladas</option>
+    <option value="todas">Todas</option>
+  </select>
+
+  <input name="q" placeholder="Buscar cliente/servicio" />
+  <button type="submit">Aplicar</button>
 </form>
-</div>
 
-<!-- Tabla de citas -->
 <table>
 <thead>
 <tr>
-<th>Cliente</th><th>Servicio</th><th>Precio</th><th>Fecha</th><th>Hora</th><th>Estado</th><th>WhatsApp</th>
+  <th>Fecha</th>
+  <th>Hora</th>
+  <th>Cliente</th>
+  <th>Servicio</th>
+  <th>Precio</th>
+  <th>Estado</th>
+  <th>Acción</th>
 </tr>
 </thead>
+
 <tbody>
-<!-- Se llenará automáticamente -->
-</tbody>
-</table>
-</div>
-
-<script>
-let citasPrevias = [];
-
-async function cargarCitas() {
-    const fecha_actual = document.getElementById('fechaFiltro').value;
-    const tbody = document.querySelector("table tbody");
-    const res = await fetch("/citas_json");
-    const data = await res.json();
-    const citas = data.citas;
-
-    // ===== Detectar nuevas citas o cancelaciones =====
-    const nuevasCitas = citas.filter(c => 
-        !citasPrevias.some(p => p.cliente === c.cliente && p.hora === c.hora && p.fecha === c.fecha && p.servicio === c.servicio)
-    );
-
-    nuevasCitas.forEach(c => {
-        if(c.servicio === "CITA CANCELADA") {
-            document.getElementById("sonidoCancelada").play();
-        } else {
-            document.getElementById("sonidoAgendada").play();
-        }
-    });
-
-    citasPrevias = [...citas]; // Actualizamos las previas
-
-    // ===== Llenar tabla =====
-    tbody.innerHTML = "";
-    citas.sort((a,b)=>a.hora.localeCompare(b.hora));
-    citas.forEach(c => {
-        let clase = "";
-        if(c.servicio === "CITA CANCELADA") clase = "cancelada";
-        else {
-            if(c.fecha === fecha_actual) clase = "today";
-            if(c.servicio.toLowerCase().includes("corte")) clase += " corte";
-            else if(c.servicio.toLowerCase().includes("barba")) clase += " barba";
-            else if(c.servicio.toLowerCase().includes("cejas")) clase += " cejas";
-        }
-
-        const tr = document.createElement("tr");
-        tr.className = clase;
-        tr.innerHTML = `
-            <td>${c.cliente}</td>
-            <td>${c.servicio}</td>
-            <td>${c.precio}</td>
-            <td>${c.fecha.split('-')[2]}/${c.fecha.split('-')[1]}/${c.fecha.split('-')[0]}</td>
-            <td>${c.hora}</td>
-            <td>${c.servicio === "CITA CANCELADA" ? "CANCELADA" : "ACTIVA"}</td>
-            <td>${c.servicio !== "CITA CANCELADA" ? `<a class="btn-whatsapp" href="https://wa.me/50672314147?text=Hola ${c.cliente}, necesito confirmar tu cita." target="_blank">💬 WhatsApp</a>` : ""}</td>
-        `;
-        tbody.appendChild(tr);
-    });
-}
-
-// ===== Inicializar fecha =====
-window.addEventListener("DOMContentLoaded",()=>{
-    const today = new Date();
-    const month = String(today.getMonth()+1).padStart(2,'0');
-    const day = String(today.getDate()).padStart(2,'0');
-    document.getElementById('fechaFiltro').value = `2026-${month}-${day}`;
-    cargarCitas();
-});
-
-// ===== Actualizar al filtrar =====
-document.getElementById("filtroForm").addEventListener("submit", e=>{
-    e.preventDefault();
-    cargarCitas();
-});
-
-// ===== Actualización automática cada 5 segundos =====
-setInterval(cargarCitas, 5000);
-</script>
-</body>
-</html>
-
-
-
-
-
-=======
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Panel del Barbero</title>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
-<style>
-*{margin:0; padding:0; box-sizing:border-box; font-family:'Montserrat',sans-serif;}
-body{background:#121212; color:#f0f0f0;}
-.container{max-width:1000px; margin:40px auto; background:#1f1f1f; padding:40px; border-radius:20px; box-shadow:0 10px 30px rgba(0,0,0,0.5);}
-h1{text-align:center; font-size:2.5rem; margin-bottom:30px; color:#D4AF37; text-shadow:1px 1px 3px #000;}
-.filter{display:flex; justify-content:center; gap:10px; margin-bottom:20px;}
-.filter input[type="date"]{padding:10px; border-radius:8px; border:1px solid #333; background:#2b2b2b; color:#f0f0f0;}
-.filter button{padding:10px 15px; border:none; border-radius:8px; background:#D4AF37; color:#121212; font-weight:bold; cursor:pointer; transition:all 0.3s;}
-.filter button:hover{background:#c29d2f; transform:scale(1.05);}
-table{width:100%; border-collapse:collapse; margin-top:20px; background:#2b2b2b; border-radius:10px; overflow:hidden;}
-th, td{padding:12px; text-align:center;}
-th{background:#333; color:#D4AF37; font-weight:bold;}
-tr:nth-child(even){background:#262626;}
-tr:nth-child(odd){background:#2b2b2b;}
-tr:hover{background:#D4AF3733;}
-.corte{border-left:4px solid #1E90FF;}
-.barba{border-left:4px solid #28a745;}
-.cejas{border-left:4px solid #800080;}
-.today{background:#3a3a3a;}
-.cancelada{background:#2b2b2b; color:#dc3545; font-weight:bold; border-left:4px solid #dc3545;}
-.btn-whatsapp{background:#25D366; color:#fff; text-decoration:none; padding:8px 12px; border-radius:8px; font-weight:bold; transition:all 0.3s;}
-.btn-whatsapp:hover{background:#1ebe57; transform:scale(1.05);}
-@media(max-width:768px){.container{padding:25px;} h1{font-size:2rem;} table,th,td{font-size:14px;} .filter{flex-direction:column; gap:10px;}}
-</style>
-</head>
-<body>
-<div class="container">
-<h1>Panel del Barbero</h1>
-
-<!-- Audios de notificación -->
-<audio id="sonidoAgendada" src="{{ url_for('static', filename='sounds/notificacion_agendada.mp3') }}"></audio>
-<audio id="sonidoCancelada" src="{{ url_for('static', filename='sounds/notificacion_cancelada.mp3') }}"></audio>
-
-<!-- Filtro por fecha -->
-<div class="filter">
-<form id="filtroForm">
-<input type="date" name="fecha" id="fechaFiltro">
-<button type="submit">Filtrar</button>
-</form>
-</div>
-
-<!-- Tabla de citas -->
-<table>
-<thead>
+{% for c in citas %}
 <tr>
-<th>Cliente</th><th>Servicio</th><th>Precio</th><th>Fecha</th><th>Hora</th><th>Estado</th><th>WhatsApp</th>
+  <td>{{ c.fecha }}</td>
+  <td>{{ c.hora }}</td>
+  <td>{{ c.cliente }}</td>
+  <td>{{ c.servicio }}</td>
+  <td>₡{{ c.precio }}</td>
+
+  <td>
+    {% if c.servicio == "CITA CANCELADA" %}
+      <span class="tag bad">Cancelada</span>
+    {% elif c.servicio == "CITA ATENDIDA" %}
+      <span class="tag done">Atendida</span>
+    {% else %}
+      <span class="tag ok">Activa</span>
+    {% endif %}
+  </td>
+
+  <td>
+    {% if c.servicio not in ["CITA CANCELADA","CITA ATENDIDA"] %}
+      <form method="POST" action="/atendida">
+        <input type="hidden" name="id" value="{{ c.id }}">
+        <button type="submit">Marcar atendida</button>
+      </form>
+    {% endif %}
+  </td>
 </tr>
-</thead>
-<tbody>
-<!-- Se llenará automáticamente -->
+{% endfor %}
 </tbody>
 </table>
+
 </div>
 
 <script>
-let citasPrevias = [];
-
-async function cargarCitas() {
-    const fecha_actual = document.getElementById('fechaFiltro').value;
-    const tbody = document.querySelector("table tbody");
-    const res = await fetch("/citas_json");
-    const data = await res.json();
-    const citas = data.citas;
-
-    // ===== Detectar nuevas citas o cancelaciones =====
-    const nuevasCitas = citas.filter(c => 
-        !citasPrevias.some(p => p.cliente === c.cliente && p.hora === c.hora && p.fecha === c.fecha && p.servicio === c.servicio)
-    );
-
-    nuevasCitas.forEach(c => {
-        if(c.servicio === "CITA CANCELADA") {
-            document.getElementById("sonidoCancelada").play();
-        } else {
-            document.getElementById("sonidoAgendada").play();
-        }
-    });
-
-    citasPrevias = [...citas]; // Actualizamos las previas
-
-    // ===== Llenar tabla =====
-    tbody.innerHTML = "";
-    citas.sort((a,b)=>a.hora.localeCompare(b.hora));
-    citas.forEach(c => {
-        let clase = "";
-        if(c.servicio === "CITA CANCELADA") clase = "cancelada";
-        else {
-            if(c.fecha === fecha_actual) clase = "today";
-            if(c.servicio.toLowerCase().includes("corte")) clase += " corte";
-            else if(c.servicio.toLowerCase().includes("barba")) clase += " barba";
-            else if(c.servicio.toLowerCase().includes("cejas")) clase += " cejas";
-        }
-
-        const tr = document.createElement("tr");
-        tr.className = clase;
-        tr.innerHTML = `
-            <td>${c.cliente}</td>
-            <td>${c.servicio}</td>
-            <td>${c.precio}</td>
-            <td>${c.fecha.split('-')[2]}/${c.fecha.split('-')[1]}/${c.fecha.split('-')[0]}</td>
-            <td>${c.hora}</td>
-            <td>${c.servicio === "CITA CANCELADA" ? "CANCELADA" : "ACTIVA"}</td>
-            <td>${c.servicio !== "CITA CANCELADA" ? `<a class="btn-whatsapp" href="https://wa.me/50672314147?text=Hola ${c.cliente}, necesito confirmar tu cita." target="_blank">💬 WhatsApp</a>` : ""}</td>
-        `;
-        tbody.appendChild(tr);
-    });
-}
-
-// ===== Inicializar fecha =====
-window.addEventListener("DOMContentLoaded",()=>{
-    const today = new Date();
-    const month = String(today.getMonth()+1).padStart(2,'0');
-    const day = String(today.getDate()).padStart(2,'0');
-    document.getElementById('fechaFiltro').value = `2026-${month}-${day}`;
-    cargarCitas();
-});
-
-// ===== Actualizar al filtrar =====
-document.getElementById("filtroForm").addEventListener("submit", e=>{
-    e.preventDefault();
-    cargarCitas();
-});
-
-// ===== Actualización automática cada 5 segundos =====
-setInterval(cargarCitas, 5000);
+const params = new URLSearchParams(window.location.search);
+const solo = params.get("solo");
+const estado = params.get("estado");
+if (solo) document.querySelector('select[name="solo"]').value = solo;
+if (estado) document.querySelector('select[name="estado"]').value = estado;
+const q = params.get("q");
+if (q) document.querySelector('input[name="q"]').value = q;
 </script>
+
 </body>
 </html>
-
-
-
-
-
->>>>>>> fc95a033753445eab450cfaba2e193b67f69b9d5
