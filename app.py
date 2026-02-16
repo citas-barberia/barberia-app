@@ -654,6 +654,9 @@ def horas():
     disponibles = [h for h in HORAS_BASE if h not in ocupadas]
     return jsonify(disponibles)
 
+@app.route("/ping")
+def ping():
+    return "ok", 200
 
 if __name__ == "__main__":
     app.run(debug=True)
