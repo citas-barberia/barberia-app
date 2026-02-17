@@ -104,7 +104,7 @@ servicios = {
 }
 
 
-# ✅ Generador de horas cada 30 min en formato 8:00am, 8:30am, etc.
+# ✅ Generador de horas cada 30 min en formato 9:00am, 9:30am, etc.
 def generar_horas(inicio_h, inicio_m, fin_h, fin_m):
     horas = []
     t = inicio_h * 60 + inicio_m
@@ -125,7 +125,7 @@ def generar_horas(inicio_h, inicio_m, fin_h, fin_m):
     return horas
 
 
-# Default (Lun-Sáb): 8:00am a 7:30pm
+# Default (Lun-Sáb): 9:00am a 7:30pm
 HORAS_BASE = generar_horas(8, 0, 19, 30)
 
 
@@ -394,7 +394,7 @@ def webhook():
         mensaje = f"""Hola 👋 Bienvenido a Barbería {NOMBRE_BARBERO} 💈
 
 🕒 Horario de atención:
-• Lunes a sábado: 8:00am – 7:30pm
+• Lunes a sábado: 9:00am – 7:30pm
 • Miércoles: {NOMBRE_BARBERO} no labora (la barbería sigue abierta)
 • Domingo: 9:00am – 3:00pm
 
@@ -487,7 +487,7 @@ Hora: {hora}
 Total: ₡{precio}
 
 🕒 Horario:
-Lunes a sábado: 8:00am – 7:30pm
+Lunes a sábado: 9:00am – 7:30pm
 Miércoles: {NOMBRE_BARBERO} no labora (la barbería sigue abierta)
 Domingo: 9:00am – 3:00pm
 
