@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, flash, url_for, jsonify, make_response
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import os
 import uuid
 import requests
@@ -103,7 +103,30 @@ servicios = {
     "Solo cejas": 2000,
 }
 
-HORAS_BASE = ["09:00am", "10:00am", "11:00am", "12:00md", "1:00pm", "2:00pm", "3:00pm", "4:00pm", "5:00pm"]
+
+# ✅ Generador de horas cada 30 min en formato 8:00am, 8:30am, etc.
+def generar_horas(inicio_h, inicio_m, fin_h, fin_m):
+    horas = []
+    t = inicio_h * 60 + inicio_m
+    fin = fin_h * 60 + fin_m
+
+    while t <= fin:
+        h = t // 60
+        m = t % 60
+
+        sufijo = "am" if h < 12 else "pm"
+        h12 = h % 12
+        if h12 == 0:
+            h12 = 12
+
+        horas.append(f"{h12}:{m:02d}{sufijo}")
+        t += 30
+
+    return horas
+
+
+# Default (Lun-Sáb): 8:00am a 7:30pm
+HORAS_BASE = generar_horas(8, 0, 19, 30)
 
 
 # =========================
@@ -367,7 +390,13 @@ def webhook():
 
         link = f"{DOMINIO}/?cliente_id={numero}"
 
+        # ✅ Mensaje con horario incluido
         mensaje = f"""Hola 👋 Bienvenido a Barbería {NOMBRE_BARBERO} 💈
+
+🕒 Horario de atención:
+• Lunes a sábado: 8:00am – 7:30pm
+• Miércoles: {NOMBRE_BARBERO} no labora (la barbería sigue abierta)
+• Domingo: 9:00am – 3:00pm
 
 Para agendar tu cita entra aquí:
 {link}
@@ -447,6 +476,7 @@ Precio: ₡{precio}
 
         if es_numero_whatsapp(cliente_id):
             link = f"{DOMINIO}/?cliente_id={cliente_id}"
+
             msg_cliente = f"""✅ Cita confirmada en Barbería {NOMBRE_BARBERO} 💈
 
 Cliente: {cliente}
@@ -455,6 +485,11 @@ Servicio: {servicio}
 Fecha: {fecha}
 Hora: {hora}
 Total: ₡{precio}
+
+🕒 Horario:
+Lunes a sábado: 8:00am – 7:30pm
+Miércoles: {NOMBRE_BARBERO} no labora (la barbería sigue abierta)
+Domingo: 9:00am – 3:00pm
 
 Para cancelar: entra a este link:
 {link}
@@ -543,17 +578,14 @@ def atendida():
 def barbero():
     clave = request.args.get("clave")
 
-    # Si ya autenticó antes, entra directo
     if barbero_autenticado():
         return _render_panel_barbero()
 
-    # Si está metiendo la clave por primera vez
     if clave == CLAVE_BARBERO:
         resp = make_response(_render_panel_barbero())
         resp.set_cookie("clave_barbero", CLAVE_BARBERO, max_age=60 * 60 * 24 * 7)  # 7 días
         return resp
 
-    # Formulario de clave (cuando no está autenticado)
     return """
     <div style='font-family:Arial;max-width:420px;margin:40px auto;padding:20px;border:1px solid #ddd;border-radius:12px;'>
       <h2>🔒 Panel del barbero</h2>
@@ -575,7 +607,6 @@ def _render_panel_barbero():
     hoy = date.today().strftime("%Y-%m-%d")
     manana = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
 
-    # ===== filtro por fecha =====
     if solo == "hoy":
         citas_dia = [c for c in citas if str(c.get("fecha")) == hoy]
     elif solo == "manana":
@@ -583,7 +614,6 @@ def _render_panel_barbero():
     else:
         citas_dia = list(citas)
 
-    # ===== métricas del día =====
     cant_total = len(citas_dia)
     cant_canceladas = sum(1 for c in citas_dia if c.get("servicio") == "CITA CANCELADA")
     cant_atendidas = sum(1 for c in citas_dia if c.get("servicio") == "CITA ATENDIDA")
@@ -604,7 +634,6 @@ def _render_panel_barbero():
         "solo": solo
     }
 
-    # ===== aplicar filtros a la tabla =====
     citas_filtradas = list(citas_dia)
 
     if estado == "activas":
@@ -613,7 +642,6 @@ def _render_panel_barbero():
         citas_filtradas = [c for c in citas_filtradas if c.get("servicio") == "CITA CANCELADA"]
     elif estado == "atendidas":
         citas_filtradas = [c for c in citas_filtradas if c.get("servicio") == "CITA ATENDIDA"]
-    # todas -> no filtra
 
     if q:
         citas_filtradas = [
@@ -623,7 +651,6 @@ def _render_panel_barbero():
         ]
 
     citas_filtradas.sort(key=lambda c: (str(c.get("fecha", "")), str(c.get("hora", ""))))
-
     return render_template("barbero.html", citas=citas_filtradas, fecha_actual=hoy, stats=stats)
 
 
@@ -641,6 +668,20 @@ def horas():
     if not fecha or not barbero:
         return jsonify([])
 
+    # Día de la semana: lunes=0 ... domingo=6
+    fecha_obj = datetime.strptime(fecha, "%Y-%m-%d")
+    dia_semana = fecha_obj.weekday()
+
+    # ✅ Miércoles: Ericson no trabaja (la barbería sigue abierta, pero Ericson no agenda)
+    if dia_semana == 2:
+        return jsonify([])
+
+    # ✅ Domingo: 9:00am a 3:00pm
+    if dia_semana == 6:
+        horas_base = generar_horas(9, 0, 15, 0)
+    else:
+        horas_base = generar_horas(8, 0, 19, 30)
+
     barbero_norm = normalizar_barbero(barbero)
 
     citas = leer_citas()
@@ -651,15 +692,18 @@ def horas():
         and c.get("servicio") != "CITA CANCELADA"
     ]
 
-    disponibles = [h for h in HORAS_BASE if h not in ocupadas]
+    disponibles = [h for h in horas_base if h not in ocupadas]
     return jsonify(disponibles)
+
 
 @app.route("/ping")
 def ping():
     return "ok", 200
 
+
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
