@@ -727,7 +727,7 @@ def horas():
     if dia_semana == 6:
         horas_base = generar_horas(9, 0, 15, 0)
     else:
-        horas_base = generar_horas(8, 0, 19, 30)
+        horas_base = generar_horas(9, 0, 19, 30)
 
     barbero_norm = normalizar_barbero(barbero)
 
