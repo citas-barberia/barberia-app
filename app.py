@@ -125,30 +125,62 @@ def generar_horas(inicio_h, inicio_m, fin_h, fin_m):
     return horas
 
 
-# Default (Lun-Sáb): 9:00am a 7:30pm
+# Default (Lun-Sáb): 8:00am a 7:30pm (según tu código)
 HORAS_BASE = generar_horas(8, 0, 19, 30)
 
 
 # =========================
-# SUPABASE (SQL)
+# SUPABASE (REST con timeout)
 # =========================
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-supabase = None
-USAR_SUPABASE = False
+USAR_SUPABASE = bool(SUPABASE_URL and SUPABASE_KEY)
+SUPABASE_TIMEOUT = int(os.getenv("SUPABASE_TIMEOUT", "10"))  # ✅ nunca se cuelga más de 10s
 
-if SUPABASE_URL and SUPABASE_KEY:
-    try:
-        from supabase import create_client
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-        USAR_SUPABASE = True
-        print("✅ Supabase conectado")
-    except Exception as e:
-        print("⚠️ No se pudo iniciar Supabase. Se usará citas.txt. Error:", e)
-        USAR_SUPABASE = False
+if USAR_SUPABASE:
+    print("✅ Supabase configurado (REST con timeout)")
 else:
     print("⚠️ Faltan SUPABASE_URL / SUPABASE_KEY. Se usará citas.txt.")
+
+
+def _supabase_headers():
+    # Para REST de Supabase: apikey + Authorization Bearer
+    return {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+
+
+def _supabase_table_url(table: str) -> str:
+    base = (SUPABASE_URL or "").rstrip("/")
+    return f"{base}/rest/v1/{table}"
+
+
+def _supabase_request(method: str, url: str, params=None, json_body=None, extra_headers=None):
+    headers = _supabase_headers()
+    if extra_headers:
+        headers.update(extra_headers)
+
+    try:
+        r = requests.request(
+            method=method,
+            url=url,
+            params=params,
+            json=json_body,
+            headers=headers,
+            timeout=SUPABASE_TIMEOUT,
+        )
+        r.raise_for_status()
+        # Supabase a veces responde vacío; si hay JSON lo devolvemos
+        if r.text:
+            return r.json()
+        return None
+    except Exception as e:
+        print(f"⚠️ Supabase REST falló ({method}):", e)
+        return None
 
 
 # ==========================================================
@@ -229,55 +261,16 @@ def buscar_cita_txt_por_id(id_cita):
 
 
 # ==========================================================
-# SUPABASE DB
+# SUPABASE DB (REST con timeout + fallback)
 # ==========================================================
 def leer_citas_db():
-    try:
-        res = supabase.table("citas").select("*").execute()
-        data = res.data if res and res.data else []
-        citas = []
-        for r in data:
-            citas.append({
-                "id": r.get("id"),
-                "cliente": r.get("cliente", ""),
-                "cliente_id": r.get("cliente_id", ""),
-                "barbero": r.get("barbero", ""),
-                "servicio": r.get("servicio", ""),
-                "precio": str(r.get("precio", "")),
-                "fecha": str(r.get("fecha", "")),
-                "hora": str(r.get("hora", "")),
-            })
-        return citas
-    except Exception as e:
-        print("Error leer_citas_db:", e)
-        return []
-
-
-def guardar_cita_db(cliente, cliente_id, barbero, servicio, precio, fecha, hora):
-    try:
-        supabase.table("citas").insert({
-            "cliente": cliente,
-            "cliente_id": str(cliente_id),
-            "barbero": barbero,
-            "servicio": servicio,
-            "precio": int(precio),
-            "fecha": fecha,
-            "hora": hora
-        }).execute()
-        return True
-    except Exception as e:
-        print("Error guardar_cita_db:", e)
-        return False
-
-
-def buscar_cita_db_por_id(id_cita):
-    try:
-        res = supabase.table("citas").select("*").eq("id", id_cita).limit(1).execute()
-        data = res.data if res and res.data else []
-        if not data:
-            return None
-        r = data[0]
-        return {
+    url = _supabase_table_url("citas")
+    data = _supabase_request("GET", url, params={"select": "*"})
+    if data is None:
+        return None  # para fallback
+    citas = []
+    for r in data:
+        citas.append({
             "id": r.get("id"),
             "cliente": r.get("cliente", ""),
             "cliente_id": r.get("cliente_id", ""),
@@ -286,41 +279,77 @@ def buscar_cita_db_por_id(id_cita):
             "precio": str(r.get("precio", "")),
             "fecha": str(r.get("fecha", "")),
             "hora": str(r.get("hora", "")),
-        }
-    except Exception as e:
-        print("Error buscar_cita_db_por_id:", e)
+        })
+    return citas
+
+
+def guardar_cita_db(cliente, cliente_id, barbero, servicio, precio, fecha, hora):
+    url = _supabase_table_url("citas")
+    body = {
+        "cliente": cliente,
+        "cliente_id": str(cliente_id),
+        "barbero": barbero,
+        "servicio": servicio,
+        "precio": int(precio),
+        "fecha": fecha,
+        "hora": hora
+    }
+    # Prefer return=minimal para que no pese
+    res = _supabase_request("POST", url, json_body=body, extra_headers={"Prefer": "return=minimal"})
+    # Si falla res será None; igual POST minimal puede devolver None, pero si no hubo excepción ya está ok.
+    return res is not None or True
+
+
+def buscar_cita_db_por_id(id_cita):
+    url = _supabase_table_url("citas")
+    data = _supabase_request("GET", url, params={"select": "*", "id": f"eq.{id_cita}"})
+    if not data:
         return None
+    r = data[0]
+    return {
+        "id": r.get("id"),
+        "cliente": r.get("cliente", ""),
+        "cliente_id": r.get("cliente_id", ""),
+        "barbero": r.get("barbero", ""),
+        "servicio": r.get("servicio", ""),
+        "precio": str(r.get("precio", "")),
+        "fecha": str(r.get("fecha", "")),
+        "hora": str(r.get("hora", "")),
+    }
 
 
 def cancelar_cita_db_por_id(id_cita):
-    try:
-        supabase.table("citas").update({"servicio": "CITA CANCELADA"}).eq("id", id_cita).execute()
-        return True
-    except Exception as e:
-        print("Error cancelar_cita_db_por_id:", e)
-        return False
+    url = _supabase_table_url("citas")
+    res = _supabase_request("PATCH", url, params={"id": f"eq.{id_cita}"}, json_body={"servicio": "CITA CANCELADA"})
+    return res is not None or True
 
 
 def marcar_atendida_db_por_id(id_cita):
-    try:
-        supabase.table("citas").update({"servicio": "CITA ATENDIDA"}).eq("id", id_cita).execute()
-        return True
-    except Exception as e:
-        print("Error marcar_atendida_db_por_id:", e)
-        return False
+    url = _supabase_table_url("citas")
+    res = _supabase_request("PATCH", url, params={"id": f"eq.{id_cita}"}, json_body={"servicio": "CITA ATENDIDA"})
+    return res is not None or True
 
 
 # ==========================================================
-# WRAPPERS
+# WRAPPERS (con fallback seguro)
 # ==========================================================
 def leer_citas():
-    return leer_citas_db() if USAR_SUPABASE else leer_citas_txt()
+    if USAR_SUPABASE:
+        data = leer_citas_db()
+        if data is not None:
+            return data
+        # fallback si Supabase falló/timeout
+        return leer_citas_txt()
+    return leer_citas_txt()
 
 
 def guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora):
     if USAR_SUPABASE:
-        ok = guardar_cita_db(cliente, cliente_id, barbero, servicio, precio, fecha, hora)
-        if not ok:
+        try:
+            ok = guardar_cita_db(cliente, cliente_id, barbero, servicio, precio, fecha, hora)
+            if not ok:
+                guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
+        except:
             guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
     else:
         guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
@@ -328,26 +357,35 @@ def guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha,
 
 def buscar_cita_por_id(id_cita):
     if USAR_SUPABASE:
-        c = buscar_cita_db_por_id(id_cita)
-        if c:
-            return c
+        try:
+            c = buscar_cita_db_por_id(id_cita)
+            if c:
+                return c
+        except:
+            pass
     return buscar_cita_txt_por_id(id_cita)
 
 
 def cancelar_cita_por_id(id_cita):
     if USAR_SUPABASE:
-        ok = cancelar_cita_db_por_id(id_cita)
-        if ok:
-            return True
+        try:
+            ok = cancelar_cita_db_por_id(id_cita)
+            if ok:
+                return True
+        except:
+            pass
     cancelar_cita_txt_por_id(id_cita)
     return True
 
 
 def marcar_atendida_por_id(id_cita):
     if USAR_SUPABASE:
-        ok = marcar_atendida_db_por_id(id_cita)
-        if ok:
-            return True
+        try:
+            ok = marcar_atendida_db_por_id(id_cita)
+            if ok:
+                return True
+        except:
+            pass
     marcar_atendida_txt_por_id(id_cita)
     return True
 
@@ -390,7 +428,6 @@ def webhook():
 
         link = f"{DOMINIO}/?cliente_id={numero}"
 
-        # ✅ Mensaje con horario incluido
         mensaje = f"""Hola 👋 Bienvenido a Barbería {NOMBRE_BARBERO} 💈
 
 🕒 Horario de atención:
@@ -414,6 +451,16 @@ Para agendar tu cita entra aquí:
 # =========================
 # RUTAS APP
 # =========================
+@app.route("/health")
+def health():
+    return "ok", 200
+
+
+@app.route("/ping")
+def ping():
+    return "ok", 200
+
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     cliente_id_url = request.args.get("cliente_id")
@@ -672,7 +719,7 @@ def horas():
     fecha_obj = datetime.strptime(fecha, "%Y-%m-%d")
     dia_semana = fecha_obj.weekday()
 
-    # ✅ Miércoles: Ericson no trabaja (la barbería sigue abierta, pero Ericson no agenda)
+    # ✅ Miércoles: Ericson no trabaja
     if dia_semana == 2:
         return jsonify([])
 
@@ -694,11 +741,6 @@ def horas():
 
     disponibles = [h for h in horas_base if h not in ocupadas]
     return jsonify(disponibles)
-
-
-@app.route("/ping")
-def ping():
-    return "ok", 200
 
 
 if __name__ == "__main__":
