@@ -125,7 +125,7 @@ def generar_horas(inicio_h, inicio_m, fin_h, fin_m):
     return horas
 
 
-# Default (Lun-Sáb): 8:00am a 7:30pm (según tu código)
+# Default (Lun-Sáb): 9:00am a 7:30pm (según tu código)
 HORAS_BASE = generar_horas(8, 0, 19, 30)
 
 
