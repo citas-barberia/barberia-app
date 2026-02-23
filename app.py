@@ -15,8 +15,8 @@ VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "barberia123")
 NUMERO_BARBERO = os.getenv("NUMERO_BARBERO", "50672314147")
 DOMINIO = os.getenv("DOMINIO", "https://barberia-app-1.onrender.com")
 
-# ✅ Nombre del barbero (Ericson)
-NOMBRE_BARBERO = os.getenv("NOMBRE_BARBERO", "Ericson")
+# ✅ Nombre del barbero (Juan)
+NOMBRE_BARBERO = os.getenv("NOMBRE_BARBERO", "Juan")
 
 # ✅ Clave para entrar al panel del barbero
 CLAVE_BARBERO = os.getenv("CLAVE_BARBERO", "1234")
@@ -719,7 +719,7 @@ def horas():
     fecha_obj = datetime.strptime(fecha, "%Y-%m-%d")
     dia_semana = fecha_obj.weekday()
 
-    # ✅ Miércoles: Ericson no trabaja
+    # ✅ Miércoles: Juan no trabaja
     if dia_semana == 2:
         return jsonify([])
 
