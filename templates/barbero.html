@@ -1,45 +1,42 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<title>Panel del Barbero</title>
+    <meta charset="UTF-8">
 
-<style>
-*{box-sizing:border-box}
-body{font-family:Arial, sans-serif; background:#121212; color:#eee; padding:20px;}
-.box{max-width:1150px; margin:auto; background:#1f1f1f; padding:20px; border-radius:14px;}
-h1{margin:0 0 10px; color:#D4AF37;}
-.filters{display:flex; gap:10px; flex-wrap:wrap; margin:15px 0;}
-input, select, button{padding:10px; border-radius:10px; border:1px solid #333; background:#2b2b2b; color:#eee;}
-button{cursor:pointer; background:#D4AF37; color:#111; font-weight:bold;}
-.small{opacity:.8; font-size:12px; margin-top:6px;}
+    <!-- ICONOS iPhone / iPad -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png">
 
-.stats{
-  display:grid;
-  grid-template-columns: repeat(5, minmax(160px, 1fr));
-  gap:10px;
-  margin:10px 0 18px;
-}
-.card{background:#2b2b2b;border:1px solid #333;border-radius:12px;padding:12px;}
-.card .t{font-size:12px; opacity:.8; margin-bottom:6px;}
-.card .v{font-size:20px; font-weight:bold;}
-.money{color:#7CFF7C;}
+    <!-- ICONO navegador -->
+    <link rel="icon" type="image/png" href="/static/icons/icon-192.png">
 
-table{width:100%; border-collapse:collapse; margin-top:10px;}
-th,td{padding:10px; border-bottom:1px solid #333; text-align:left;}
-th{color:#D4AF37;}
-.tag{padding:4px 8px; border-radius:999px; font-size:12px; display:inline-block;}
-.ok{background:#28a745;}
-.bad{background:#dc3545;}
-.done{background:#007bff;}
-</style>
+    <!-- PWA -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0b0f19">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <title>Panel del Barbero</title>
+
+    <style>
+        *{box-sizing:border-box}
+        body{font-family:Arial, sans-serif; background:#121212; color:#f5f5f5;}
+        .box{max-width:1150px; margin:auto; background:#1f1f1f;}
+        h1{margin:0 0 10px; color:#D4AF37;}
+        .filters{display:flex; gap:10px; flex-wrap:wrap;}
+        input, select, button{padding:10px; border-radius:10px;}
+        button{cursor:pointer; background:#D4AF37; color:#111;}
+        .small{opacity:.8; font-size:12px; margin-top:6px;}
+
+        table{width:100%; border-collapse:collapse; margin-top:10px;}
+        th,td{padding:10px; border-bottom:1px solid #333; text-align:left;}
+        th{color:#D4AF37;}
+
+        .tag{padding:4px 8px; border-radius:999px; font-size:12px; display:inline-block;}
+        .ok{background:#28a745;}
+        .bad{background:#dc3545;}
+        .done{background:#007bff;}
+    </style>
 </head>
-<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
-<link rel="manifest" href="/static/manifest.json">
-<link rel="manifest" href="/static/manifest.json">
-<meta name="theme-color" content="#0b0f19">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <body>
 <div class="box">
 
