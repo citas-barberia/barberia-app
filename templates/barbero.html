@@ -1,38 +1,56 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- PWA / ICONOS -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png">
-    <link rel="icon" type="image/png" href="/static/icons/icon-192.png">
-    <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#0b0f19">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Panel del Barbero</title>
 
-    <title>Panel del Barbero</title>
+  <!-- ICONOS iPhone / iPad -->
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png">
 
-    <!-- ✅ TU ESTILO ORIGINAL (como estaba antes) -->
-    <style>
-        *{box-sizing:border-box}
-        body{font-family:Arial, sans-serif; background:#121212; color:#f5f5f5;}
-        .box{max-width:1150px; margin:auto; background:#1f1f1f;}
-        h1{margin:0 0 10px; color:#D4AF37;}
-        .filters{display:flex; gap:10px; flex-wrap:wrap;}
-        input, select, button{padding:10px; border-radius:10px;}
-        button{cursor:pointer; background:#D4AF37; color:#111;}
-        .small{opacity:.8; font-size:12px; margin-top:6px;}
+  <!-- ICONO navegador -->
+  <link rel="icon" type="image/png" href="/static/icons/icon-192.png">
 
-        table{width:100%; border-collapse:collapse; margin-top:10px;}
-        th,td{padding:10px; border-bottom:1px solid #333; text-align:left;}
-        th{color:#D4AF37;}
+  <!-- PWA -->
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#0b0f19">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-        .tag{padding:4px 8px; border-radius:999px; font-size:12px; display:inline-block;}
-        .ok{background:#28a745;}
-        .bad{background:#dc3545;}
-        .done{background:#007bff;}
-    </style>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background:#121212; color:#f5f5f5; margin:0; }
+
+    .box { max-width:1150px; margin:auto; background:#1f1f1f; padding:18px; border-radius:14px; }
+    h1 { margin:0 0 12px; color:#D4AF37; }
+
+    /* cards */
+    .stats { display:flex; gap:10px; flex-wrap:wrap; margin: 10px 0 12px; }
+    .card { background:#2a2a2a; padding:10px 12px; border-radius:12px; min-width:160px; }
+    .card .label { font-size:12px; opacity:.8; }
+    .card .value { font-size:18px; font-weight:bold; margin-top:4px; }
+    .money { color:#28a745; }
+
+    /* filtros */
+    .filters { display:flex; gap:10px; flex-wrap:wrap; }
+    input, select, button { padding:10px; border-radius:10px; border: none; }
+    input, select { background:#121212; color:#f5f5f5; border:1px solid #333; }
+    button { cursor:pointer; background:#D4AF37; color:#111; font-weight:bold; }
+
+    .small { opacity:.8; font-size:12px; margin-top:6px; }
+
+    /* tabla */
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
+    th,td { padding:10px; border-bottom:1px solid #333; text-align:left; }
+    th { color:#D4AF37; }
+
+    /* tags */
+    .tag { padding:4px 8px; border-radius:999px; font-size:12px; display:inline-block; color:#fff; }
+    .ok  { background:#28a745; }
+    .bad { background:#dc3545; }
+    .done{ background:#007bff; }
+  </style>
 </head>
 <body>
 <div class="box">
