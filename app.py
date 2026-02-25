@@ -16,7 +16,7 @@ NUMERO_BARBERO = os.getenv("NUMERO_BARBERO", "50672314147")
 DOMINIO = os.getenv("DOMINIO", "https://barberia-app-1.onrender.com")
 
 # ✅ Nombre del barbero (Juan)
-NOMBRE_BARBERO = os.getenv("NOMBRE_BARBERO", "Juan")
+NOMBRE_BARBERO = os.getenv("NOMBRE_BARBERO", "Erickson")
 
 # ✅ Clave para entrar al panel del barbero
 CLAVE_BARBERO = os.getenv("CLAVE_BARBERO", "1234")

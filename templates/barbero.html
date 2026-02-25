@@ -9,8 +9,9 @@
   <!-- ICONOS iPhone / iPad -->
   <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png">
 
-  <!-- ICONO navegador -->
-  <link rel="icon" type="image/png" href="/static/icons/icon-192.png">
+  <!-- ICONO navegador / PWA -->
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/static/icons/icon-512.png">
 
   <!-- PWA -->
   <link rel="manifest" href="/static/manifest.json">
@@ -20,42 +21,46 @@
 
   <style>
     * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; background:#121212; color:#f5f5f5; margin:0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: #f5f5f5;
+      margin: 0;
+      padding: 0;
+    }
 
-    .box { max-width:1150px; margin:auto; background:#1f1f1f; padding:18px; border-radius:14px; }
-    h1 { margin:0 0 12px; color:#D4AF37; }
+    /* ✅ Esto ayuda a que en móvil se vea “completo” y cómodo */
+    .box {
+      max-width: 1150px;
+      margin: 16px auto;
+      padding: 16px;
+      background: #1f1f1f;
+      border-radius: 16px;
+    }
 
-    /* cards */
-    .stats { display:flex; gap:10px; flex-wrap:wrap; margin: 10px 0 12px; }
-    .card { background:#2a2a2a; padding:10px 12px; border-radius:12px; min-width:160px; }
-    .card .label { font-size:12px; opacity:.8; }
-    .card .value { font-size:18px; font-weight:bold; margin-top:4px; }
-    .money { color:#28a745; }
+    h1 { margin: 0 0 10px; color: #D4AF37; }
 
-    /* filtros */
-    .filters { display:flex; gap:10px; flex-wrap:wrap; }
-    input, select, button { padding:10px; border-radius:10px; border: none; }
-    input, select { background:#121212; color:#f5f5f5; border:1px solid #333; }
-    button { cursor:pointer; background:#D4AF37; color:#111; font-weight:bold; }
+    .filters { display: flex; gap: 10px; flex-wrap: wrap; }
+    input, select, button { padding: 10px; border-radius: 10px; border: none; }
+    input, select { background: #111; color: #f5f5f5; border: 1px solid #333; }
+    button { cursor: pointer; background: #D4AF37; color: #111; }
 
-    .small { opacity:.8; font-size:12px; margin-top:6px; }
+    .small { opacity: .8; font-size: 12px; margin-top: 6px; }
 
-    /* tabla */
-    table { width:100%; border-collapse:collapse; margin-top:10px; }
-    th,td { padding:10px; border-bottom:1px solid #333; text-align:left; }
-    th { color:#D4AF37; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 10px; border-bottom: 1px solid #333; text-align: left; }
+    th { color: #D4AF37; }
 
-    /* tags */
-    .tag { padding:4px 8px; border-radius:999px; font-size:12px; display:inline-block; color:#fff; }
-    .ok  { background:#28a745; }
-    .bad { background:#dc3545; }
-    .done{ background:#007bff; }
+    .tag { padding: 4px 8px; border-radius: 999px; font-size: 12px; display: inline-block; }
+    .ok { background: #28a745; }
+    .bad { background: #dc3545; }
+    .done { background: #007bff; }
   </style>
 </head>
 <body>
 <div class="box">
 
-<h1>Panel de Juan 💈</h1>
+<h1>Panel de Erickson 💈</h1>
 
 <!-- ✅ CONTADORES -->
 <div class="stats">
