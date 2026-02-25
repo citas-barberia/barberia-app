@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <title>Agendar Cita - Barbería</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
 
 <style>
@@ -43,11 +45,15 @@ tr:hover { background: #D4AF3733; }
 .alert-error { background-color: #dc3545; color: #fff; }
 @keyframes fadeIn { to { opacity: 1; } }
 @keyframes fadeOut { to { opacity: 0; } }
+
+@media (max-width: 520px){
+  .container{ margin: 14px; padding: 18px; }
+  h1{ font-size: 1.9rem; }
+}
 </style>
 
 <script>
 async function actualizarHoras() {
-
     const fecha = document.getElementById("fecha").value;
     const barbero = document.getElementById("barbero").value;
     const selectHora = document.getElementById("hora");
@@ -76,7 +82,6 @@ async function actualizarHoras() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-
     const fechaInput = document.getElementById("fecha");
     const today = new Date();
 
@@ -89,17 +94,14 @@ window.addEventListener("DOMContentLoaded", () => {
     fechaInput.max = `${year}-12-31`;
 
     actualizarHoras();
-
 });
 </script>
 
 </head>
 
 <body>
-
 <div class="container">
 
-<!-- ✅ Título personalizado -->
 <h1>Agenda tu cita con {{ nombre_barbero }} 💈</h1>
 
 {% with messages = get_flashed_messages() %}
@@ -113,38 +115,37 @@ window.addEventListener("DOMContentLoaded", () => {
 {% endwith %}
 
 <form method="POST">
+  <input type="hidden" name="cliente_id" value="{{ cliente_id }}">
 
- <input type="hidden" name="cliente_id" value="{{ cliente_id }}">
+  <input type="text" name="cliente" placeholder="Tu nombre" required>
 
-<input type="text" name="cliente" placeholder="Tu nombre" required>
+  <!-- ✅ Barbero fijo (Erickson) -->
+  <input type="text"
+        name="barbero"
+        id="barbero"
+        value="{{ nombre_barbero }}"
+        readonly
+        required>
 
-<!-- ✅ Barbero fijo (Juan) -->
-<input type="text"
-       name="barbero"
-       id="barbero"
-       value="{{ nombre_barbero }}"
-       readonly
-       required>
+  <!-- ✅ si cambia servicio, recarga horas -->
+  <select name="servicio" required onchange="actualizarHoras()">
+    <option value="">Seleccione un servicio</option>
+    {% for s, p in servicios.items() %}
+      <option value="{{ s }}">{{ s }} - ₡{{ p }}</option>
+    {% endfor %}
+  </select>
 
-<select name="servicio" required>
-<option value="">Seleccione un servicio</option>
-{% for s, p in servicios.items() %}
-<option value="{{ s }}">{{ s }} - ₡{{ p }}</option>
-{% endfor %}
-</select>
+  <input type="date" id="fecha" name="fecha" onchange="actualizarHoras()" required>
 
-<input type="date" id="fecha" name="fecha" onchange="actualizarHoras()" required>
+  <!-- ✅ Horas disponibles -->
+  <select id="hora" name="hora" required></select>
 
-<select id="hora" name="hora" required></select>
-
-<button type="submit">Agendar Cita</button>
-
+  <button type="submit">Agendar Cita</button>
 </form>
 
 <h2>Tus Citas</h2>
 
 <table>
-
 <tr>
 <th>Cliente</th>
 <th>Barbero</th>
@@ -158,7 +159,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
 {% for c in citas %}
 <tr>
-
 <td>{{ c.cliente }}</td>
 <td>{{ c.barbero }}</td>
 <td>{{ c.servicio }}</td>
@@ -167,33 +167,30 @@ window.addEventListener("DOMContentLoaded", () => {
 <td>{{ c.hora }}</td>
 
 <td>
-{% if c.servicio != "CITA CANCELADA" %}
-<form method="POST" action="{{ url_for('cancelar') }}">
-    <input type="hidden" name="id" value="{{ c.id }}">
-    <button type="submit">Cancelar</button>
-</form>
-{% endif %}
+  <!-- ✅ solo deja cancelar si NO está cancelada y la fecha es hoy o futura -->
+  {% if c.servicio != "CITA CANCELADA" and c.fecha >= hoy %}
+    <form method="POST" action="{{ url_for('cancelar') }}">
+      <input type="hidden" name="id" value="{{ c.id }}">
+      <button type="submit">Cancelar</button>
+    </form>
+  {% endif %}
 </td>
 
 <td>
-{% if c.servicio != "CITA CANCELADA" %}
-<a class="btn-whatsapp"
-   href="https://wa.me/{{ numero_barbero }}?text=Hola%20vengo%20por%20la%20cita%20de%20la%20barber%C3%ADa"
-   target="_blank">
- WhatsApp
-</a>
-{% endif %}
+  {% if c.servicio != "CITA CANCELADA" %}
+    <a class="btn-whatsapp"
+      href="https://wa.me/{{ numero_barbero }}?text=Hola%20vengo%20por%20la%20cita%20de%20la%20barber%C3%ADa"
+      target="_blank">
+    WhatsApp
+    </a>
+  {% endif %}
 </td>
-
 </tr>
 {% endfor %}
-
 </table>
 
 </div>
-
 </body>
 </html>
-
 
 

@@ -548,14 +548,17 @@ Para cancelar: entra a este link:
         resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
         return resp
 
+    hoy = date.today().strftime("%Y-%m-%d")
+
     resp = make_response(render_template(
-        "index.html",
-        servicios=servicios,
-        citas=citas_cliente,
-        cliente_id=cliente_id,
-        numero_barbero=NUMERO_BARBERO,
-        nombre_barbero=NOMBRE_BARBERO
-    ))
+    "index.html",
+    servicios=servicios,
+    citas=citas_cliente,
+    cliente_id=cliente_id,
+    numero_barbero=NUMERO_BARBERO,
+    nombre_barbero=NOMBRE_BARBERO,
+    hoy=hoy
+))
     resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
     return resp
 

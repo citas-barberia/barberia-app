@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
   <title>Panel del Barbero</title>
 
   <!-- ICONOS iPhone / iPad -->
@@ -20,208 +19,155 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <style>
-    :root{
-      --bg: #121212;
-      --panel: #1f1f1f;
-      --card: #2a2a2a;
-      --line: #333;
-      --gold: #D4AF37;
-      --text: #f5f5f5;
-      --muted: rgba(245,245,245,.75);
-      --green: #28a745;
-      --red: #dc3545;
-      --blue: #007bff;
-    }
-
-    *{ box-sizing:border-box; }
+    * { box-sizing: border-box; }
     body{
       margin:0;
-      padding:0;
       font-family: Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
+      background:#0f0f10;
+      color:#f5f5f5;
     }
 
-    /* ✅ Contenedor bonito centrado */
     .box{
-      max-width: 1100px;
-      margin: 16px auto;
+      max-width: 1150px;
+      margin: 18px auto;
       padding: 16px;
-      background: var(--panel);
+      background: #1a1a1b;
       border-radius: 18px;
-      box-shadow: 0 12px 35px rgba(0,0,0,.45);
+      box-shadow: 0 12px 30px rgba(0,0,0,.45);
     }
 
     h1{
       margin: 0 0 14px;
-      color: var(--gold);
+      color:#D4AF37;
       font-size: 34px;
-      letter-spacing: .3px;
+      letter-spacing: .2px;
     }
 
-    /* ✅ Tarjetas (como tu diseño anterior) */
+    /* ✅ Tarjetas como tu screenshot */
     .stats{
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 12px;
-      margin-bottom: 12px;
+      margin-bottom: 14px;
     }
-
     .card{
-      background: var(--card);
-      border: 1px solid rgba(255,255,255,.06);
-      border-radius: 16px;
-      padding: 14px;
-      min-height: 78px;
-      display:flex;
-      flex-direction:column;
-      justify-content:center;
+      background:#242425;
+      border-radius: 14px;
+      padding: 12px 14px;
+      border: 1px solid rgba(255,255,255,.05);
     }
-
     .card .t{
+      opacity: .8;
       font-size: 12px;
-      color: rgba(255,255,255,.7);
       margin-bottom: 6px;
     }
-
     .card .v{
       font-size: 20px;
       font-weight: 700;
-      color: var(--text);
     }
+    .money{ color:#28a745; }
 
-    .card .v.money{
-      color: var(--green);
-    }
-
-    /* ✅ Filtros */
     .filters{
       display:flex;
-      gap: 10px;
+      gap:10px;
       flex-wrap: wrap;
-      align-items:center;
+      align-items: center;
       margin: 10px 0 6px;
     }
-
-    select, input{
+    input, select, button{
       padding: 10px 12px;
       border-radius: 12px;
-      border: 1px solid rgba(255,255,255,.08);
-      background: #111;
-      color: var(--text);
+      border: 1px solid #333;
+      background:#111;
+      color:#f5f5f5;
       outline: none;
     }
-
-    input{
-      min-width: 220px;
-      flex: 1;
-    }
-
     button{
-      padding: 10px 14px;
-      border-radius: 12px;
-      border: none;
       cursor:pointer;
+      background:#D4AF37;
+      color:#111;
+      border: none;
       font-weight: 700;
-      background: var(--gold);
-      color: #111;
-      transition: transform .15s ease, box-shadow .15s ease;
-    }
-
-    button:hover{
-      transform: translateY(-1px);
-      box-shadow: 0 10px 18px rgba(212,175,55,.18);
+      padding: 10px 16px;
     }
 
     .small{
-      font-size: 12px;
-      color: var(--muted);
-      margin: 6px 0 12px;
+      opacity:.7;
+      font-size:12px;
+      margin: 8px 0 6px;
     }
 
     /* ✅ Tabla */
-    table{
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 8px;
-      overflow: hidden;
+    .table-wrap{
+      overflow-x:auto;
+      -webkit-overflow-scrolling: touch;
       border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.06);
     }
-
-    thead th{
+    table{
+      width:100%;
+      border-collapse: collapse;
+      min-width: 760px;
+      background:#1f1f20;
+    }
+    th,td{
+      padding: 12px;
+      border-bottom: 1px solid #2e2e2f;
       text-align:left;
-      color: var(--gold);
-      font-weight: 800;
-      padding: 12px 12px;
-      border-bottom: 1px solid var(--line);
-      background: rgba(255,255,255,.03);
     }
+    th{ color:#D4AF37; font-weight: 800; }
 
-    tbody td{
-      padding: 12px 12px;
-      border-bottom: 1px solid rgba(255,255,255,.06);
-    }
-
-    tbody tr:hover{
-      background: rgba(212,175,55,.06);
-    }
-
-    /* ✅ Estado con colores */
     .tag{
       padding: 6px 10px;
       border-radius: 999px;
       font-size: 12px;
-      font-weight: 800;
       display:inline-block;
+      font-weight: 700;
     }
-    .ok{ background: rgba(40,167,69,.18); color: #7CFF9B; border: 1px solid rgba(40,167,69,.35); }
-    .bad{ background: rgba(220,53,69,.18); color: #FF8A8A; border: 1px solid rgba(220,53,69,.35); }
-    .done{ background: rgba(0,123,255,.18); color: #7CB7FF; border: 1px solid rgba(0,123,255,.35); }
+    .ok{ background:#1f7a3a; }
+    .bad{ background:#a83232; }
+    .done{ background:#0b5ed7; }
 
-    /* ✅ Botón “Marcar atendida” más pro */
-    .btn-row form{ margin:0; }
-    .btn-row button{
-      padding: 9px 12px;
-      border-radius: 12px;
-      background: var(--gold);
-      color: #111;
-      font-weight: 800;
-      white-space: nowrap;
-    }
-
-    /* ✅ Responsive (para que en iPhone no se vea “cortado”) */
+    /* ✅ Responsive (iPhone) */
     @media (max-width: 900px){
-      .stats{ grid-template-columns: repeat(2, 1fr); }
       h1{ font-size: 28px; }
-      .box{ margin: 10px; padding: 14px; }
-
-      /* tabla scrolleable horizontal */
-      .table-wrap{
-        width: 100%;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        border-radius: 14px;
-      }
-      table{ min-width: 820px; }
+      .stats{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .card .v{ font-size: 18px; }
+      .box{ margin: 12px; }
     }
   </style>
 </head>
 
 <body>
   <div class="box">
-
     <h1>Panel de Erickson 💈</h1>
 
     <!-- ✅ CONTADORES -->
     <div class="stats">
       <div class="card">
-        <div class="t" id="t_citas">Citas</div>
+        <div class="t" id="t_citas">Citas (Hoy)</div>
         <div class="v" id="v_total">{{ stats.cant_total }}</div>
       </div>
-      <div class="card"><div class="t">Activas</div><div class="v" id="v_activas">{{ stats.cant_activas }}</div></div>
-      <div class="card"><div class="t">Atendidas</div><div class="v" id="v_atendidas">{{ stats.cant_atendidas }}</div></div>
-      <div class="card"><div class="t">Canceladas</div><div class="v" id="v_canceladas">{{ stats.cant_canceladas }}</div></div>
-      <div class="card"><div class="t">Total cobrado (Atendidas)</div><div class="v money" id="v_total_cobrado">₡{{ stats.total_atendido }}</div></div>
+
+      <div class="card">
+        <div class="t">Activas</div>
+        <div class="v" id="v_activas">{{ stats.cant_activas }}</div>
+      </div>
+
+      <div class="card">
+        <div class="t">Atendidas</div>
+        <div class="v" id="v_atendidas">{{ stats.cant_atendidas }}</div>
+      </div>
+
+      <div class="card">
+        <div class="t">Canceladas</div>
+        <div class="v" id="v_canceladas">{{ stats.cant_canceladas }}</div>
+      </div>
+
+      <div class="card">
+        <div class="t">Total cobrado (Atendidas)</div>
+        <div class="v money" id="v_total_cobrado">₡{{ stats.total_atendido }}</div>
+      </div>
     </div>
 
     <!-- ✅ FILTROS -->
@@ -253,9 +199,8 @@
             <th>Fecha</th><th>Hora</th><th>Cliente</th><th>Servicio</th><th>Precio</th><th>Estado</th><th>Acción</th>
           </tr>
         </thead>
-
         <tbody id="tbody">
-          {% for c in citas %}
+        {% for c in citas %}
           <tr>
             <td>{{ c.fecha }}</td>
             <td>{{ c.hora }}</td>
@@ -271,8 +216,7 @@
                 <span class="tag ok">Activa</span>
               {% endif %}
             </td>
-
-            <td class="btn-row">
+            <td>
               {% if c.servicio not in ["CITA CANCELADA","CITA ATENDIDA"] %}
                 <form method="POST" action="/atendida">
                   <input type="hidden" name="id" value="{{ c.id }}">
@@ -281,173 +225,172 @@
               {% endif %}
             </td>
           </tr>
-          {% endfor %}
+        {% endfor %}
         </tbody>
       </table>
     </div>
-
   </div>
 
-  <script>
-    function precioAInt(p){
-      if(p === null || p === undefined) return 0;
-      return parseInt(String(p).replace("₡","").replaceAll(",","").trim() || "0", 10) || 0;
-    }
+<script>
+function precioAInt(p){
+  if(p === null || p === undefined) return 0;
+  return parseInt(String(p).replace("₡","").replaceAll(",","").trim() || "0", 10) || 0;
+}
 
-    function aplicarFiltros(citas){
-      const solo = document.getElementById("solo").value;
-      const estado = document.getElementById("estado").value;
-      const q = (document.getElementById("q").value || "").trim().toLowerCase();
+function aplicarFiltros(citas){
+  const solo = document.getElementById("solo").value;
+  const estado = document.getElementById("estado").value;
+  const q = (document.getElementById("q").value || "").trim().toLowerCase();
 
-      const hoy = new Date();
-      const yyyy = hoy.getFullYear();
-      const mm = String(hoy.getMonth()+1).padStart(2,"0");
-      const dd = String(hoy.getDate()).padStart(2,"0");
-      const hoyStr = `${yyyy}-${mm}-${dd}`;
+  const hoy = new Date();
+  const yyyy = hoy.getFullYear();
+  const mm = String(hoy.getMonth()+1).padStart(2,"0");
+  const dd = String(hoy.getDate()).padStart(2,"0");
+  const hoyStr = `${yyyy}-${mm}-${dd}`;
 
-      const manana = new Date(hoy);
-      manana.setDate(hoy.getDate()+1);
-      const my = manana.getFullYear();
-      const mmm = String(manana.getMonth()+1).padStart(2,"0");
-      const mdd = String(manana.getDate()).padStart(2,"0");
-      const mananaStr = `${my}-${mmm}-${mdd}`;
+  const manana = new Date(hoy);
+  manana.setDate(hoy.getDate()+1);
+  const my = manana.getFullYear();
+  const mmm = String(manana.getMonth()+1).padStart(2,"0");
+  const mdd = String(manana.getDate()).padStart(2,"0");
+  const mananaStr = `${my}-${mmm}-${mdd}`;
 
-      let base = [...citas];
+  let base = [...citas];
 
-      if(solo === "hoy") base = base.filter(c => String(c.fecha) === hoyStr);
-      if(solo === "manana") base = base.filter(c => String(c.fecha) === mananaStr);
+  if(solo === "hoy") base = base.filter(c => String(c.fecha) === hoyStr);
+  if(solo === "manana") base = base.filter(c => String(c.fecha) === mananaStr);
 
-      if(estado === "activas") base = base.filter(c => !["CITA CANCELADA","CITA ATENDIDA"].includes(c.servicio));
-      if(estado === "canceladas") base = base.filter(c => c.servicio === "CITA CANCELADA");
-      if(estado === "atendidas") base = base.filter(c => c.servicio === "CITA ATENDIDA");
+  if(estado === "activas") base = base.filter(c => !["CITA CANCELADA","CITA ATENDIDA"].includes(c.servicio));
+  if(estado === "canceladas") base = base.filter(c => c.servicio === "CITA CANCELADA");
+  if(estado === "atendidas") base = base.filter(c => c.servicio === "CITA ATENDIDA");
 
-      if(q){
-        base = base.filter(c =>
-          String(c.cliente||"").toLowerCase().includes(q) ||
-          String(c.servicio||"").toLowerCase().includes(q)
-        );
-      }
+  if(q){
+    base = base.filter(c =>
+      String(c.cliente||"").toLowerCase().includes(q) ||
+      String(c.servicio||"").toLowerCase().includes(q)
+    );
+  }
 
-      base.sort((a,b) => {
-        const k1 = String(a.fecha).localeCompare(String(b.fecha));
-        if(k1 !== 0) return k1;
-        return String(a.hora).localeCompare(String(b.hora));
-      });
+  base.sort((a,b) => {
+    const k1 = String(a.fecha).localeCompare(String(b.fecha));
+    if(k1 !== 0) return k1;
+    return String(a.hora).localeCompare(String(b.hora));
+  });
 
-      return { base, hoyStr, mananaStr };
-    }
+  return { base, hoyStr, mananaStr };
+}
 
-    function renderTabla(citas){
-      const tbody = document.getElementById("tbody");
-      tbody.innerHTML = "";
+function renderTabla(citas){
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
 
-      citas.forEach(c => {
-        const tr = document.createElement("tr");
+  citas.forEach(c => {
+    const tr = document.createElement("tr");
 
-        const estado = c.servicio === "CITA CANCELADA" ? "Cancelada"
-                    : c.servicio === "CITA ATENDIDA" ? "Atendida"
-                    : "Activa";
+    const estado = c.servicio === "CITA CANCELADA" ? "Cancelada"
+                : c.servicio === "CITA ATENDIDA" ? "Atendida"
+                : "Activa";
 
-        const tagClass = c.servicio === "CITA CANCELADA" ? "bad"
-                      : c.servicio === "CITA ATENDIDA" ? "done"
-                      : "ok";
+    const tagClass = c.servicio === "CITA CANCELADA" ? "bad"
+                  : c.servicio === "CITA ATENDIDA" ? "done"
+                  : "ok";
 
-        tr.innerHTML = `
-          <td>${c.fecha}</td>
-          <td>${c.hora}</td>
-          <td>${c.cliente || ""}</td>
-          <td>${c.servicio || ""}</td>
-          <td>₡${c.precio || 0}</td>
-          <td><span class="tag ${tagClass}">${estado}</span></td>
-          <td class="btn-row">
-            ${
-              (!["CITA CANCELADA","CITA ATENDIDA"].includes(c.servicio)) ?
-              `<form method="POST" action="/atendida">
-                  <input type="hidden" name="id" value="${c.id}">
-                  <button type="submit">Marcar atendida</button>
-                </form>`
-              : ""
-            }
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function actualizarStats(citasDia, solo){
-      const cant_total = citasDia.length;
-      const cant_canceladas = citasDia.filter(c => c.servicio === "CITA CANCELADA").length;
-      const cant_atendidas = citasDia.filter(c => c.servicio === "CITA ATENDIDA").length;
-      const cant_activas = citasDia.filter(c => !["CITA CANCELADA","CITA ATENDIDA"].includes(c.servicio)).length;
-      const total_atendido = citasDia
-        .filter(c => c.servicio === "CITA ATENDIDA")
-        .reduce((acc, c) => acc + precioAInt(c.precio), 0);
-
-      document.getElementById("v_total").textContent = cant_total;
-      document.getElementById("v_activas").textContent = cant_activas;
-      document.getElementById("v_atendidas").textContent = cant_atendidas;
-      document.getElementById("v_canceladas").textContent = cant_canceladas;
-      document.getElementById("v_total_cobrado").textContent = "₡" + total_atendido;
-
-      const t = solo === "hoy" ? "Citas (Hoy)"
-            : solo === "manana" ? "Citas (Mañana)"
-            : "Citas (Todas)";
-      document.getElementById("t_citas").textContent = t;
-    }
-
-    async function cargarCitas(guardarParams=false){
-      try{
-        const res = await fetch(`/citas_json?t=${Date.now()}`);
-        const data = await res.json();
-        const citas = data.citas || [];
-
-        const solo = document.getElementById("solo").value;
-        const { base, hoyStr, mananaStr } = aplicarFiltros(citas);
-
-        let citasDia = [...citas];
-        if(solo === "hoy") citasDia = citas.filter(c => String(c.fecha) === hoyStr);
-        if(solo === "manana") citasDia = citas.filter(c => String(c.fecha) === mananaStr);
-
-        actualizarStats(citasDia, solo);
-        renderTabla(base);
-
-        document.getElementById("last_update").textContent =
-          "Última actualización: " + new Date().toLocaleTimeString();
-
-        if(guardarParams){
-          const params = new URLSearchParams(window.location.search);
-          params.set("solo", document.getElementById("solo").value);
-          params.set("estado", document.getElementById("estado").value);
-          params.set("q", document.getElementById("q").value || "");
-          history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+    tr.innerHTML = `
+      <td>${c.fecha}</td>
+      <td>${c.hora}</td>
+      <td>${c.cliente || ""}</td>
+      <td>${c.servicio || ""}</td>
+      <td>₡${c.precio || 0}</td>
+      <td><span class="tag ${tagClass}">${estado}</span></td>
+      <td>
+        ${
+          (!["CITA CANCELADA","CITA ATENDIDA"].includes(c.servicio)) ?
+          `<form method="POST" action="/atendida">
+              <input type="hidden" name="id" value="${c.id}">
+              <button type="submit">Marcar atendida</button>
+            </form>`
+          : ""
         }
-      }catch(e){
-        document.getElementById("last_update").textContent = "No se pudo actualizar (revisa internet).";
-      }
-    }
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
 
-    (function(){
+function actualizarStats(citasDia, solo){
+  const cant_total = citasDia.length;
+  const cant_canceladas = citasDia.filter(c => c.servicio === "CITA CANCELADA").length;
+  const cant_atendidas = citasDia.filter(c => c.servicio === "CITA ATENDIDA").length;
+  const cant_activas = citasDia.filter(c => !["CITA CANCELADA","CITA ATENDIDA"].includes(c.servicio)).length;
+  const total_atendido = citasDia
+    .filter(c => c.servicio === "CITA ATENDIDA")
+    .reduce((acc, c) => acc + precioAInt(c.precio), 0);
+
+  document.getElementById("v_total").textContent = cant_total;
+  document.getElementById("v_activas").textContent = cant_activas;
+  document.getElementById("v_atendidas").textContent = cant_atendidas;
+  document.getElementById("v_canceladas").textContent = cant_canceladas;
+  document.getElementById("v_total_cobrado").textContent = "₡" + total_atendido;
+
+  const t = solo === "hoy" ? "Citas (Hoy)"
+        : solo === "manana" ? "Citas (Mañana)"
+        : "Citas (Todas)";
+  document.getElementById("t_citas").textContent = t;
+}
+
+async function cargarCitas(guardarParams=false){
+  try{
+    const res = await fetch(`/citas_json?t=${Date.now()}`);
+    const data = await res.json();
+    const citas = data.citas || [];
+
+    const solo = document.getElementById("solo").value;
+    const { base, hoyStr, mananaStr } = aplicarFiltros(citas);
+
+    let citasDia = [...citas];
+    if(solo === "hoy") citasDia = citas.filter(c => String(c.fecha) === hoyStr);
+    if(solo === "manana") citasDia = citas.filter(c => String(c.fecha) === mananaStr);
+
+    actualizarStats(citasDia, solo);
+    renderTabla(base);
+
+    document.getElementById("last_update").textContent =
+      "Última actualización: " + new Date().toLocaleTimeString();
+
+    if(guardarParams){
       const params = new URLSearchParams(window.location.search);
-      const solo = params.get("solo");
-      const estado = params.get("estado");
-      const q = params.get("q");
-      if(solo) document.getElementById("solo").value = solo;
-      if(estado) document.getElementById("estado").value = estado;
-      if(q) document.getElementById("q").value = q;
-    })();
-
-    cargarCitas(false);
-    setInterval(() => cargarCitas(false), 5000);
-  </script>
-
-  <script>
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("/static/service-worker.js");
-      });
+      params.set("solo", document.getElementById("solo").value);
+      params.set("estado", document.getElementById("estado").value);
+      params.set("q", document.getElementById("q").value || "");
+      history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
     }
-  </script>
+  }catch(e){
+    document.getElementById("last_update").textContent =
+      "No se pudo actualizar (revisa internet).";
+  }
+}
+
+(function(){
+  const params = new URLSearchParams(window.location.search);
+  const solo = params.get("solo");
+  const estado = params.get("estado");
+  const q = params.get("q");
+  if(solo) document.getElementById("solo").value = solo;
+  if(estado) document.getElementById("estado").value = estado;
+  if(q) document.getElementById("q").value = q;
+})();
+
+cargarCitas(false);
+setInterval(() => cargarCitas(false), 5000);
+</script>
+
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/static/service-worker.js");
+    });
+  }
+</script>
 </body>
 </html>
-
 
