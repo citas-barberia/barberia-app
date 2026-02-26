@@ -645,13 +645,16 @@ def barbero():
 def _render_panel_barbero():
     citas = leer_citas()
 
-    solo = request.args.get("solo", "hoy")          # hoy | manana | todas
-    estado = request.args.get("estado", "activas")  # activas | atendidas | canceladas | todas
+    # filtros: hoy | manana | todas
+    solo = request.args.get("solo", "hoy")
+    # estado: activas | atendidas | canceladas | todas
+    estado = request.args.get("estado", "activas")
     q = (request.args.get("q") or "").strip().lower()
 
     hoy = date.today().strftime("%Y-%m-%d")
     manana = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
 
+    # ✅ Base por día seleccionado
     if solo == "hoy":
         citas_dia = [c for c in citas if str(c.get("fecha")) == hoy]
     elif solo == "manana":
@@ -659,6 +662,7 @@ def _render_panel_barbero():
     else:
         citas_dia = list(citas)
 
+    # ✅ Contadores (según el filtro de día)
     cant_total = len(citas_dia)
     cant_canceladas = sum(1 for c in citas_dia if c.get("servicio") == "CITA CANCELADA")
     cant_atendidas = sum(1 for c in citas_dia if c.get("servicio") == "CITA ATENDIDA")
@@ -670,15 +674,33 @@ def _render_panel_barbero():
         if c.get("servicio") == "CITA ATENDIDA"
     )
 
-    stats = {
-        "cant_total": cant_total,
-        "cant_activas": cant_activas,
-        "cant_atendidas": cant_atendidas,
-        "cant_canceladas": cant_canceladas,
-        "total_atendido": total_atendido,
-        "solo": solo
-    }
+    # ✅ Historial mensual 2026 (todas las citas del 2026, NO solo del día)
+    meses = {str(i).zfill(2): {
+        "mes": str(i).zfill(2),
+        "total": 0,
+        "activas": 0,
+        "atendidas": 0,
+        "canceladas": 0,
+        "total_cobrado": 0
+    } for i in range(1, 13)}
 
+    for c in citas:
+        f = str(c.get("fecha", ""))
+        if len(f) >= 7 and f.startswith("2026-"):
+            mm = f[5:7]
+            if mm in meses:
+                meses[mm]["total"] += 1
+                if c.get("servicio") == "CITA CANCELADA":
+                    meses[mm]["canceladas"] += 1
+                elif c.get("servicio") == "CITA ATENDIDA":
+                    meses[mm]["atendidas"] += 1
+                    meses[mm]["total_cobrado"] += _precio_a_int(c.get("precio"))
+                else:
+                    meses[mm]["activas"] += 1
+
+    historial_2026 = [meses[m] for m in sorted(meses.keys())]
+
+    # ✅ Aplicar filtro estado + búsqueda al listado mostrado
     citas_filtradas = list(citas_dia)
 
     if estado == "activas":
@@ -696,7 +718,24 @@ def _render_panel_barbero():
         ]
 
     citas_filtradas.sort(key=lambda c: (str(c.get("fecha", "")), str(c.get("hora", ""))))
-    return render_template("barbero.html", citas=citas_filtradas, fecha_actual=hoy, stats=stats)
+
+    stats = {
+        "cant_total": cant_total,
+        "cant_activas": cant_activas,
+        "cant_atendidas": cant_atendidas,
+        "cant_canceladas": cant_canceladas,
+        "total_atendido": total_atendido,
+        "solo": solo,
+        "nombre": NOMBRE_BARBERO
+    }
+
+    return render_template(
+        "barbero.html",
+        citas=citas_filtradas,
+        fecha_actual=hoy,
+        stats=stats,
+        historial_2026=historial_2026
+    )
 
 
 @app.route("/citas_json")
