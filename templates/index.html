@@ -168,7 +168,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
 <td>
   <!-- ✅ solo deja cancelar si NO está cancelada y la fecha es hoy o futura -->
-  {% if c.servicio != "CITA CANCELADA" and c.fecha >= hoy %}
+  {% if c.servicio != "CITA CANCELADA" and c.fecha >= hoy_iso %}
     <form method="POST" action="{{ url_for('cancelar') }}">
       <input type="hidden" name="id" value="{{ c.id }}">
       <button type="submit">Cancelar</button>

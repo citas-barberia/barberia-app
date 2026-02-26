@@ -557,7 +557,7 @@ Para cancelar: entra a este link:
     cliente_id=cliente_id,
     numero_barbero=NUMERO_BARBERO,
     nombre_barbero=NOMBRE_BARBERO,
-    hoy=hoy
+    hoy_iso=date.today().strftime("%Y-%m-%d")
 ))
     resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
     return resp
@@ -681,7 +681,8 @@ def _render_panel_barbero():
         "cant_atendidas": cant_atendidas,
         "cant_canceladas": cant_canceladas,
         "total_atendido": total_atendido,
-        "solo": solo
+        "solo": solo,
+        "nombre": NOMBRE_BARBERO
     }
 
     citas_filtradas = list(citas_dia)

@@ -2,17 +2,20 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- ✅ CLAVE para que en iPhone no se vea “pequeño/zoom out” -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
   <title>Panel del Barbero</title>
 
-  <!-- ICONOS iPhone / iPad -->
+  <!-- ✅ ICONOS iPhone / iPad -->
   <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-title" content="Barbería Citas">
 
-  <!-- ICONO navegador / PWA -->
+  <!-- ✅ ICONOS navegador / PWA -->
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="/static/icons/icon-512.png">
 
-  <!-- PWA -->
+  <!-- ✅ PWA -->
   <link rel="manifest" href="/static/manifest.json">
   <meta name="theme-color" content="#0b0f19">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -20,18 +23,22 @@
 
   <style>
     * { box-sizing: border-box; }
+
     body{
       margin:0;
-      font-family: Arial, sans-serif;
       background:#0f0f10;
       color:#f5f5f5;
+      font-family: Arial, sans-serif;
+      min-height: 100vh;
     }
 
+    /* ✅ Se ve “amplio” como tu 2da foto */
     .box{
-      max-width: 1150px;
-      margin: 18px auto;
+      width: calc(100% - 24px);
+      max-width: 1200px;
+      margin: 12px auto;
       padding: 16px;
-      background: #1a1a1b;
+      background: #1b1b1c;
       border-radius: 18px;
       box-shadow: 0 12px 30px rgba(0,0,0,.45);
     }
@@ -39,108 +46,117 @@
     h1{
       margin: 0 0 14px;
       color:#D4AF37;
-      font-size: 34px;
-      letter-spacing: .2px;
+      font-size: 42px;
+      line-height: 1.1;
+      letter-spacing: .3px;
     }
 
-    /* ✅ Tarjetas como tu screenshot */
+    /* ✅ tarjetas de stats (como tu diseño bonito) */
     .stats{
-      display: grid;
+      display:grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 12px;
       margin-bottom: 14px;
     }
     .card{
       background:#242425;
-      border-radius: 14px;
-      padding: 12px 14px;
-      border: 1px solid rgba(255,255,255,.05);
+      border:1px solid #2e2e2f;
+      border-radius: 16px;
+      padding: 14px;
+      min-height: 86px;
     }
-    .card .t{
-      opacity: .8;
-      font-size: 12px;
-      margin-bottom: 6px;
-    }
-    .card .v{
-      font-size: 20px;
-      font-weight: 700;
-    }
+    .t{ opacity:.85; font-size: 12px; }
+    .v{ font-size: 26px; margin-top: 8px; font-weight: 700; }
     .money{ color:#28a745; }
 
     .filters{
       display:flex;
       gap:10px;
-      flex-wrap: wrap;
-      align-items: center;
-      margin: 10px 0 6px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top: 8px;
+      margin-bottom: 6px;
     }
-    input, select, button{
-      padding: 10px 12px;
-      border-radius: 12px;
-      border: 1px solid #333;
-      background:#111;
+
+    input, select{
+      padding: 12px 12px;
+      border-radius: 14px;
+      background:#121213;
       color:#f5f5f5;
-      outline: none;
+      border:1px solid #2f2f30;
+      outline:none;
+      min-height: 44px;
     }
+
     button{
+      padding: 12px 18px;
+      border-radius: 16px;
+      border:none;
       cursor:pointer;
       background:#D4AF37;
       color:#111;
-      border: none;
       font-weight: 700;
-      padding: 10px 16px;
+      min-height: 44px;
     }
 
     .small{
-      opacity:.7;
-      font-size:12px;
-      margin: 8px 0 6px;
+      opacity:.75;
+      font-size: 13px;
+      margin: 8px 0 12px;
     }
 
-    /* ✅ Tabla */
     .table-wrap{
       overflow-x:auto;
-      -webkit-overflow-scrolling: touch;
       border-radius: 14px;
-      border: 1px solid rgba(255,255,255,.06);
+      border:1px solid #2f2f30;
+      background:#171718;
     }
+
     table{
       width:100%;
-      border-collapse: collapse;
-      min-width: 760px;
-      background:#1f1f20;
+      border-collapse:collapse;
+      min-width: 820px; /* ✅ en móvil hace scroll horizontal, pero NO se corta feo */
     }
-    th,td{
+
+    th, td{
       padding: 12px;
-      border-bottom: 1px solid #2e2e2f;
+      border-bottom:1px solid #2a2a2b;
       text-align:left;
+      white-space: nowrap;
     }
-    th{ color:#D4AF37; font-weight: 800; }
+    th{
+      color:#D4AF37;
+      font-size: 14px;
+      background:#1a1a1b;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
 
     .tag{
-      padding: 6px 10px;
+      padding:6px 10px;
       border-radius: 999px;
       font-size: 12px;
-      display:inline-block;
       font-weight: 700;
+      display:inline-block;
     }
-    .ok{ background:#1f7a3a; }
-    .bad{ background:#a83232; }
-    .done{ background:#0b5ed7; }
+    .ok{ background:#28a745; }
+    .bad{ background:#dc3545; }
+    .done{ background:#007bff; }
 
-    /* ✅ Responsive (iPhone) */
+    /* ✅ Responsivo bonito */
     @media (max-width: 900px){
-      h1{ font-size: 28px; }
+      h1{ font-size: 34px; }
       .stats{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .card .v{ font-size: 18px; }
-      .box{ margin: 12px; }
+      .card{ min-height: 84px; }
     }
   </style>
 </head>
 
 <body>
   <div class="box">
-    <h1>Panel de Erickson 💈</h1>
+
+    <h1>Panel de {{ stats.get('nombre', 'Erickson') }} 💈</h1>
 
     <!-- ✅ CONTADORES -->
     <div class="stats">
@@ -200,7 +216,7 @@
           </tr>
         </thead>
         <tbody id="tbody">
-        {% for c in citas %}
+          {% for c in citas %}
           <tr>
             <td>{{ c.fecha }}</td>
             <td>{{ c.hora }}</td>
@@ -218,17 +234,18 @@
             </td>
             <td>
               {% if c.servicio not in ["CITA CANCELADA","CITA ATENDIDA"] %}
-                <form method="POST" action="/atendida">
+                <form method="POST" action="/atendida" style="margin:0;">
                   <input type="hidden" name="id" value="{{ c.id }}">
                   <button type="submit">Marcar atendida</button>
                 </form>
               {% endif %}
             </td>
           </tr>
-        {% endfor %}
+          {% endfor %}
         </tbody>
       </table>
     </div>
+
   </div>
 
 <script>
@@ -305,7 +322,7 @@ function renderTabla(citas){
       <td>
         ${
           (!["CITA CANCELADA","CITA ATENDIDA"].includes(c.servicio)) ?
-          `<form method="POST" action="/atendida">
+          `<form method="POST" action="/atendida" style="margin:0;">
               <input type="hidden" name="id" value="${c.id}">
               <button type="submit">Marcar atendida</button>
             </form>`
@@ -313,6 +330,7 @@ function renderTabla(citas){
         }
       </td>
     `;
+
     tbody.appendChild(tr);
   });
 }
@@ -391,6 +409,7 @@ setInterval(() => cargarCitas(false), 5000);
     });
   }
 </script>
+
 </body>
 </html>
 
