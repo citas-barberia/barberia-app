@@ -1,195 +1,229 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Agendar Cita - Barbería</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Agendar Cita - {{ nombre_barbero }}</title>
+    
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        body { 
+            background: #0f0f10; 
+            color: #f5f5f5; 
+            margin: 0; 
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+        }
 
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+        .container {
+            width: 100%;
+            max-width: 480px; /* Tamaño ideal para móvil */
+            background: #1b1b1c;
+            padding: 25px;
+            border-radius: 24px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+            margin-top: 10px;
+        }
 
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Montserrat', sans-serif; }
-body { background: #121212; color: #f0f0f0; }
-.container { max-width: 800px; margin: 40px auto; background: #1f1f1f; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-h1 { text-align: center; font-size: 2.5rem; margin-bottom: 30px; color: #D4AF37; text-shadow: 1px 1px 3px #000; }
-h2 { margin-top: 40px; margin-bottom: 20px; color: #ccc; text-align: center; }
-form { display: flex; flex-direction: column; gap: 20px; }
-input, select, button { padding: 15px; font-size: 16px; border-radius: 10px; border: 1px solid #333; outline: none; transition: all 0.3s ease; }
-input, select { background: #2b2b2b; color: #f0f0f0; }
-input:focus, select:focus { border-color: #D4AF37; box-shadow: 0 0 10px #D4AF37; }
-button { background: #D4AF37; color: #121212; font-weight: bold; cursor: pointer; transition: all 0.3s ease; }
-button:hover { background: #c29d2f; transform: scale(1.03); }
-table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #2b2b2b; border-radius: 10px; overflow: hidden; }
-th, td { padding: 12px; text-align: center; }
-th { background: #333; color: #D4AF37; font-weight: bold; }
-tr:nth-child(even) { background: #262626; }
-tr:nth-child(odd) { background: #2b2b2b; }
-tr:hover { background: #D4AF3733; }
+        h1 { 
+            color: #D4AF37; 
+            text-align: center; 
+            font-size: 26px; 
+            margin-bottom: 25px;
+            line-height: 1.3;
+        }
 
-/* ✅ BOTÓN WHATSAPP */
-.btn-whatsapp {
-    display: inline-block;
-    background: #25D366;
-    color: #fff;
-    text-decoration: none;
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-weight: bold;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-}
-.btn-whatsapp:hover { background: #1ebe57; transform: scale(1.05); }
+        .form-group { margin-bottom: 18px; }
 
-.alert { padding: 12px; border-radius: 12px; margin-bottom: 20px; text-align: center; font-weight: bold; opacity: 0; animation: fadeIn 0.5s forwards, fadeOut 0.5s 2.5s forwards; }
-.alert-success { background-color: #28a745; color: #fff; }
-.alert-error { background-color: #dc3545; color: #fff; }
-@keyframes fadeIn { to { opacity: 1; } }
-@keyframes fadeOut { to { opacity: 0; } }
+        label { 
+            display: block; 
+            margin-bottom: 8px; 
+            font-size: 14px; 
+            color: #D4AF37;
+            font-weight: 600;
+        }
 
-@media (max-width: 520px){
-  .container{ margin: 14px; padding: 18px; }
-  h1{ font-size: 1.9rem; }
-}
-</style>
+        /* Inputs más grandes y cómodos */
+        input, select {
+            width: 100%;
+            padding: 16px;
+            background: #242425;
+            border: 1px solid #333;
+            border-radius: 14px;
+            color: #fff;
+            font-size: 16px;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        input:focus, select:focus {
+            border-color: #D4AF37;
+            background: #2a2a2b;
+        }
+
+        button.btn-principal {
+            width: 100%;
+            padding: 18px;
+            background: #D4AF37;
+            color: #000;
+            border: none;
+            border-radius: 14px;
+            font-size: 18px;
+            font-weight: 800;
+            cursor: pointer;
+            margin-top: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button.btn-principal:active { transform: scale(0.96); }
+
+        /* Sección de Tus Citas */
+        .tus-citas {
+            margin-top: 40px;
+            border-top: 1px solid #333;
+            padding-top: 20px;
+        }
+
+        .cita-card {
+            background: #242425;
+            padding: 18px;
+            border-radius: 16px;
+            margin-bottom: 15px;
+            border-left: 5px solid #D4AF37;
+            position: relative;
+        }
+
+        .cita-card strong { color: #D4AF37; font-size: 17px; display: block; margin-bottom: 5px; }
+        .cita-card span { display: block; font-size: 14px; opacity: 0.8; margin-bottom: 3px; }
+
+        .btn-cancelar {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+
+        .flash {
+            background: #D4AF37;
+            color: #000;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Agenda tu cita con<br>{{ nombre_barbero }} 💈</h1>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for message in messages %}
+          <div class="flash">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form action="/" method="POST">
+        <input type="hidden" name="cliente_id" value="{{ cliente_id }}">
+        <input type="hidden" name="barbero" value="{{ nombre_barbero }}">
+
+        <div class="form-group">
+            <label>Tu Nombre:</label>
+            <input type="text" name="cliente" placeholder="Escribe tu nombre completo" required>
+        </div>
+
+        <div class="form-group">
+            <label>Servicio:</label>
+            <select name="servicio" required>
+                <option value="" disabled selected>¿Qué servicio buscas?</option>
+                {% for nombre, precio in servicios.items() %}
+                <option value="{{ nombre }}">{{ nombre }} - ₡{{ precio }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Fecha:</label>
+            <input type="date" id="fecha" name="fecha" value="{{ hoy_iso }}" required onchange="actualizarHoras()">
+        </div>
+
+        <div class="form-group">
+            <label>Hora disponible:</label>
+            <select name="hora" id="hora_select" required>
+                <option value="">Primero elige una fecha...</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn-principal">Reservar Espacio</button>
+    </form>
+
+    <div class="tus-citas">
+        <h2 style="text-align: center; color: #fff; font-size: 20px;">Mis Citas Agendadas</h2>
+        {% for c in citas %}
+        <div class="cita-card">
+            <strong>{{ c.servicio }}</strong>
+            <span>📅 Fecha: {{ c.fecha }}</span>
+            <span>🕒 Hora: {{ c.hora }}</span>
+            <span>💰 Precio: {{ c.precio }}</span>
+            
+            {% if c.servicio != "CITA CANCELADA" and c.servicio != "CITA ATENDIDA" %}
+            <form action="/cancelar" method="POST">
+                <input type="hidden" name="id" value="{{ c.id }}">
+                <button type="submit" class="btn-cancelar" onclick="return confirm('¿Seguro que quieres cancelar?')">Cancelar Cita</button>
+            </form>
+            {% endif %}
+        </div>
+        {% else %}
+        <p style="text-align: center; opacity: 0.5;">Aún no tienes citas.</p>
+        {% endfor %}
+    </div>
+</div>
 
 <script>
+// Lógica para cargar las horas dinámicamente sin recargar la página
 async function actualizarHoras() {
-    const fecha = document.getElementById("fecha").value;
-    const barbero = document.getElementById("barbero").value;
-    const selectHora = document.getElementById("hora");
+    const fecha = document.getElementById('fecha').value;
+    const barbero = "{{ nombre_barbero }}";
+    const select = document.getElementById('hora_select');
+    
+    select.innerHTML = '<option value="">Cargando horas...</option>';
 
-    if(!fecha || !barbero) return;
+    try {
+        const res = await fetch(`/horas?fecha=${fecha}&barbero=${barbero}`);
+        const horas = await res.json();
 
-    const res = await fetch(`/horas?fecha=${encodeURIComponent(fecha)}&barbero=${encodeURIComponent(barbero)}&t=${Date.now()}`);
-    const horas = await res.json();
-
-    selectHora.innerHTML = "";
-
-    if(horas.length === 0){
-        const option = document.createElement("option");
-        option.text = "No hay horas disponibles";
-        option.value = "";
-        selectHora.appendChild(option);
-        return;
+        select.innerHTML = '';
+        if (horas.length === 0) {
+            select.innerHTML = '<option value="">No hay horas disponibles</option>';
+        } else {
+            select.innerHTML = '<option value="" disabled selected>Selecciona la hora</option>';
+            horas.forEach(h => {
+                const opt = document.createElement('option');
+                opt.value = h;
+                opt.textContent = h;
+                select.appendChild(opt);
+            });
+        }
+    } catch (e) {
+        select.innerHTML = '<option value="">Error al cargar</option>';
     }
-
-    horas.forEach(h => {
-        const option = document.createElement("option");
-        option.value = h;
-        option.text = h;
-        selectHora.appendChild(option);
-    });
 }
 
-window.addEventListener("DOMContentLoaded", () => {
-    const fechaInput = document.getElementById("fecha");
-    const today = new Date();
-
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-
-    fechaInput.value = `${year}-${month}-${day}`;
-    fechaInput.min = `${year}-01-01`;
-    fechaInput.max = `${year}-12-31`;
-
-    actualizarHoras();
-});
+// Cargar horas al iniciar
+window.onload = actualizarHoras;
 </script>
 
-</head>
-
-<body>
-<div class="container">
-
-<h1>Agenda tu cita con {{ nombre_barbero }} 💈</h1>
-
-{% with messages = get_flashed_messages() %}
-{% if messages %}
-{% for msg in messages %}
-<div class="alert {% if 'exitosamente' in msg %}alert-success{% else %}alert-error{% endif %}">
-{{ msg }}
-</div>
-{% endfor %}
-{% endif %}
-{% endwith %}
-
-<form method="POST">
-  <input type="hidden" name="cliente_id" value="{{ cliente_id }}">
-
-  <input type="text" name="cliente" placeholder="Tu nombre" required>
-
-  <!-- ✅ Barbero fijo (Erickson) -->
-  <input type="text"
-        name="barbero"
-        id="barbero"
-        value="{{ nombre_barbero }}"
-        readonly
-        required>
-
-  <!-- ✅ si cambia servicio, recarga horas -->
-  <select name="servicio" required onchange="actualizarHoras()">
-    <option value="">Seleccione un servicio</option>
-    {% for s, p in servicios.items() %}
-      <option value="{{ s }}">{{ s }} - ₡{{ p }}</option>
-    {% endfor %}
-  </select>
-
-  <input type="date" id="fecha" name="fecha" onchange="actualizarHoras()" required>
-
-  <!-- ✅ Horas disponibles -->
-  <select id="hora" name="hora" required></select>
-
-  <button type="submit">Agendar Cita</button>
-</form>
-
-<h2>Tus Citas</h2>
-
-<table>
-<tr>
-<th>Cliente</th>
-<th>Barbero</th>
-<th>Servicio</th>
-<th>Precio</th>
-<th>Fecha</th>
-<th>Hora</th>
-<th>Cancelar</th>
-<th>WhatsApp</th>
-</tr>
-
-{% for c in citas %}
-<tr>
-<td>{{ c.cliente }}</td>
-<td>{{ c.barbero }}</td>
-<td>{{ c.servicio }}</td>
-<td>{{ c.precio }}</td>
-<td>{{ c.fecha.split('-')[2] }}/{{ c.fecha.split('-')[1] }}/{{ c.fecha.split('-')[0] }}</td>
-<td>{{ c.hora }}</td>
-
-<td>
-  <!-- ✅ solo deja cancelar si NO está cancelada y la fecha es hoy o futura -->
-  {% if c.servicio != "CITA CANCELADA" and c.fecha >= hoy_iso %}
-    <form method="POST" action="{{ url_for('cancelar') }}">
-      <input type="hidden" name="id" value="{{ c.id }}">
-      <button type="submit">Cancelar</button>
-    </form>
-  {% endif %}
-</td>
-
-<td>
-  {% if c.servicio != "CITA CANCELADA" %}
-    <a class="btn-whatsapp"
-      href="https://wa.me/{{ numero_barbero }}?text=Hola%20vengo%20por%20la%20cita%20de%20la%20barber%C3%ADa"
-      target="_blank">
-    WhatsApp
-    </a>
-  {% endif %}
-</td>
-</tr>
-{% endfor %}
-</table>
-
-</div>
 </body>
 </html>
 
