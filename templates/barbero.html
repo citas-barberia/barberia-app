@@ -34,12 +34,30 @@
       box-shadow: 0 12px 30px rgba(0,0,0,.45);
     }
 
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom: 12px;
+    }
+
     h1 {
-      margin: 0 0 14px;
+      margin: 0;
       color: #D4AF37;
       font-size: 36px;
       line-height: 1.1;
-      text-align: center;
+    }
+
+    .btn-hist{
+      text-decoration:none;
+      background:#D4AF37;
+      color:#111;
+      font-weight:800;
+      padding:10px 14px;
+      border-radius:12px;
+      white-space:nowrap;
     }
 
     /* STATS RESPONSIVAS */
@@ -156,63 +174,30 @@
     .bad { background: #dc3545; color: #fff; }
     .done { background: #007bff; color: #fff; }
 
-    /* HISTORIAL */
-    .historial {
-      margin-top: 18px;
-      padding-top: 14px;
-      border-top: 1px solid #2f2f30;
-    }
-    .historial h2{
-      margin: 0 0 10px;
-      font-size: 16px;
-      opacity: .9;
-      text-align: center;
-    }
-    .hist-wrap {
-      overflow-x: auto;
-      border-radius: 14px;
-      border: 1px solid #2f2f30;
-    }
-    .hist-wrap table { min-width: 760px; }
-
     /* RESPONSIVIDAD LOGICA */
     @media (min-width: 800px) {
       .table-wrap { display: block; }
       .citas-mobile-container { display: none; }
-      h1 { text-align: left; font-size: 42px; }
+      h1 { font-size: 42px; }
     }
   </style>
 </head>
 
 <body>
   <div class="box">
-    <h1>Panel de {{ stats.get('nombre', 'Erickson') }} 💈</h1>
-
-    <!-- ✅ STATS (ahora incluye canceladas) -->
-    <div class="stats">
-      <div class="card">
-        <div class="t" id="t_citas">Citas</div>
-        <div class="v" id="v_total">{{ stats.cant_total }}</div>
-      </div>
-      <div class="card">
-        <div class="t">Activas</div>
-        <div class="v" id="v_activas">{{ stats.cant_activas }}</div>
-      </div>
-      <div class="card">
-        <div class="t">Atendidas</div>
-        <div class="v" id="v_atendidas">{{ stats.cant_atendidas }}</div>
-      </div>
-      <div class="card">
-        <div class="t">Canceladas</div>
-        <div class="v" id="v_canceladas">{{ stats.cant_canceladas }}</div>
-      </div>
-      <div class="card">
-        <div class="t">Total Cobrado</div>
-        <div class="v money" id="v_total_cobrado">₡{{ stats.total_atendido }}</div>
-      </div>
+    <div class="topbar">
+      <h1>Panel de {{ stats.get('nombre', 'Erickson') }} 💈</h1>
+      <a class="btn-hist" href="/barbero/historial">📊 Ver Historial 2026</a>
     </div>
 
-    <!-- filtros -->
+    <div class="stats">
+      <div class="card"><div class="t" id="t_citas">Citas</div><div class="v" id="v_total">{{ stats.cant_total }}</div></div>
+      <div class="card"><div class="t">Activas</div><div class="v" id="v_activas">{{ stats.cant_activas }}</div></div>
+      <div class="card"><div class="t">Atendidas</div><div class="v" id="v_atendidas">{{ stats.cant_atendidas }}</div></div>
+      <div class="card"><div class="t">Canceladas</div><div class="v" id="v_canceladas">{{ stats.cant_canceladas }}</div></div>
+      <div class="card"><div class="t">Total Cobrado</div><div class="v money" id="v_total_cobrado">₡{{ stats.total_atendido }}</div></div>
+    </div>
+
     <form class="filters" onsubmit="event.preventDefault(); cargarCitas(true);">
       <select id="solo">
         <option value="hoy">Hoy</option>
@@ -231,10 +216,8 @@
 
     <div class="small" id="last_update">Actualizando…</div>
 
-    <!-- móvil -->
     <div id="cards-container" class="citas-mobile-container"></div>
 
-    <!-- pc -->
     <div class="table-wrap">
       <table>
         <thead>
@@ -245,77 +228,36 @@
         <tbody id="tbody"></tbody>
       </table>
     </div>
-
-    <!-- ✅ Historial mensual 2026 -->
-    <div class="historial">
-      <h2>Historial mensual 2026</h2>
-      <div class="hist-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Mes</th><th>Total</th><th>Activas</th><th>Atendidas</th><th>Canceladas</th><th>Total cobrado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for m in historial_2026 %}
-            <tr>
-              <td>{{ m.mes }}</td>
-              <td>{{ m.total }}</td>
-              <td>{{ m.activas }}</td>
-              <td>{{ m.atendidas }}</td>
-              <td>{{ m.canceladas }}</td>
-              <td>₡{{ m.total_cobrado }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
   </div>
 
 <script>
 function precioAInt(p){
   return parseInt(String(p||"0").replace("₡","").replaceAll(",","").trim()) || 0;
 }
-
 function isoHoy(){
   const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth()+1).padStart(2,"0");
-  const dd = String(d.getDate()).padStart(2,"0");
-  return `${yyyy}-${mm}-${dd}`;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
-
 function isoManana(){
   const d = new Date();
   d.setDate(d.getDate()+1);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth()+1).padStart(2,"0");
-  const dd = String(d.getDate()).padStart(2,"0");
-  return `${yyyy}-${mm}-${dd}`;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
-
 function aplicarFiltros(citas){
   const solo = document.getElementById("solo").value;
   const estado = document.getElementById("estado").value;
   const q = (document.getElementById("q").value || "").toLowerCase();
-
   const hoy = isoHoy();
   const manana = isoManana();
-
   let base = [...citas];
 
-  // ✅ filtro por día
   if(solo === "hoy") base = base.filter(c => String(c.fecha) === hoy);
   if(solo === "manana") base = base.filter(c => String(c.fecha) === manana);
 
-  // ✅ filtro por estado
   if(estado === "activas") base = base.filter(c => !["CITA CANCELADA","CITA ATENDIDA"].includes(c.servicio));
   if(estado === "atendidas") base = base.filter(c => c.servicio === "CITA ATENDIDA");
   if(estado === "canceladas") base = base.filter(c => c.servicio === "CITA CANCELADA");
 
-  // ✅ búsqueda
   if(q){
     base = base.filter(c =>
       String(c.cliente||"").toLowerCase().includes(q) ||
@@ -323,24 +265,15 @@ function aplicarFiltros(citas){
     );
   }
 
-  // ordenar
-  base.sort((a,b) => {
-    const k1 = String(a.fecha).localeCompare(String(b.fecha));
-    if(k1 !== 0) return k1;
-    return String(a.hora).localeCompare(String(b.hora));
-  });
-
+  base.sort((a,b) => String(a.fecha).localeCompare(String(b.fecha)) || String(a.hora).localeCompare(String(b.hora)));
   return { base, solo, hoy, manana };
 }
-
 function actualizarStats(citasDia){
   const cant_total = citasDia.length;
   const cant_canceladas = citasDia.filter(c => c.servicio === "CITA CANCELADA").length;
   const cant_atendidas = citasDia.filter(c => c.servicio === "CITA ATENDIDA").length;
   const cant_activas = citasDia.filter(c => !["CITA CANCELADA","CITA ATENDIDA"].includes(c.servicio)).length;
-  const total_atendido = citasDia
-    .filter(c => c.servicio === "CITA ATENDIDA")
-    .reduce((acc, c) => acc + precioAInt(c.precio), 0);
+  const total_atendido = citasDia.filter(c => c.servicio === "CITA ATENDIDA").reduce((acc,c) => acc + precioAInt(c.precio), 0);
 
   document.getElementById("v_total").textContent = cant_total;
   document.getElementById("v_activas").textContent = cant_activas;
@@ -348,11 +281,9 @@ function actualizarStats(citasDia){
   document.getElementById("v_canceladas").textContent = cant_canceladas;
   document.getElementById("v_total_cobrado").textContent = "₡" + total_atendido;
 }
-
-function renderCitas(citas) {
+function renderCitas(citas){
   const tbody = document.getElementById("tbody");
   const cardsContainer = document.getElementById("cards-container");
-  
   tbody.innerHTML = "";
   cardsContainer.innerHTML = "";
 
@@ -361,7 +292,6 @@ function renderCitas(citas) {
     const estadoTxt = c.servicio === "CITA CANCELADA" ? "Cancelada" : (c.servicio === "CITA ATENDIDA" ? "Atendida" : "Activa");
     const tagClass = c.servicio === "CITA CANCELADA" ? "bad" : (c.servicio === "CITA ATENDIDA" ? "done" : "ok");
 
-    // tabla (PC)
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${c.fecha}</td><td>${c.hora}</td><td>${c.cliente || ""}</td>
@@ -371,7 +301,6 @@ function renderCitas(citas) {
     `;
     tbody.appendChild(tr);
 
-    // tarjetas (Móvil)
     const card = document.createElement("div");
     card.className = "cita-item";
     card.innerHTML = `
@@ -396,7 +325,6 @@ function renderCitas(citas) {
     cardsContainer.appendChild(card);
   });
 }
-
 async function cargarCitas(guardarParams=false){
   try{
     const res = await fetch(`/citas_json?t=${Date.now()}`);
@@ -405,7 +333,6 @@ async function cargarCitas(guardarParams=false){
 
     const { base, solo, hoy, manana } = aplicarFiltros(citas);
 
-    // stats del día según selector
     let citasDia = [...citas];
     if(solo === "hoy") citasDia = citas.filter(c => String(c.fecha) === hoy);
     if(solo === "manana") citasDia = citas.filter(c => String(c.fecha) === manana);
@@ -413,9 +340,7 @@ async function cargarCitas(guardarParams=false){
     actualizarStats(citasDia);
     renderCitas(base);
 
-    const titulo = solo === "hoy" ? "Citas (Hoy)" : solo === "manana" ? "Citas (Mañana)" : "Citas (Todas)";
-    document.getElementById("t_citas").textContent = titulo;
-
+    document.getElementById("t_citas").textContent = solo === "hoy" ? "Citas (Hoy)" : solo === "manana" ? "Citas (Mañana)" : "Citas (Todas)";
     document.getElementById("last_update").textContent = "Última actualización: " + new Date().toLocaleTimeString();
 
     if(guardarParams){
@@ -425,12 +350,11 @@ async function cargarCitas(guardarParams=false){
       params.set("q", document.getElementById("q").value || "");
       history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
     }
-  } catch(e) {
+  }catch(e){
     document.getElementById("last_update").textContent = "No se pudo actualizar (revisa internet).";
   }
 }
-
-// cargar filtros desde URL si vienen
+// cargar filtros desde URL
 (function(){
   const params = new URLSearchParams(window.location.search);
   const solo = params.get("solo");
@@ -440,7 +364,6 @@ async function cargarCitas(guardarParams=false){
   if(estado) document.getElementById("estado").value = estado;
   if(q) document.getElementById("q").value = q;
 })();
-
 setInterval(() => cargarCitas(false), 5000);
 cargarCitas(false);
 </script>

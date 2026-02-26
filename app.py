@@ -737,7 +737,44 @@ def _render_panel_barbero():
         historial_2026=historial_2026
     )
 
+@app.route("/barbero/historial", methods=["GET"])
+def barbero_historial():
+    if not barbero_autenticado():
+        return redirect(url_for("barbero"))
 
+    citas = leer_citas()
+
+    # Historial mensual 2026
+    meses = {str(i).zfill(2): {
+        "mes": str(i).zfill(2),
+        "total": 0,
+        "activas": 0,
+        "atendidas": 0,
+        "canceladas": 0,
+        "total_cobrado": 0
+    } for i in range(1, 13)}
+
+    for c in citas:
+        f = str(c.get("fecha", ""))
+        if len(f) >= 7 and f.startswith("2026-"):
+            mm = f[5:7]
+            if mm in meses:
+                meses[mm]["total"] += 1
+                if c.get("servicio") == "CITA CANCELADA":
+                    meses[mm]["canceladas"] += 1
+                elif c.get("servicio") == "CITA ATENDIDA":
+                    meses[mm]["atendidas"] += 1
+                    meses[mm]["total_cobrado"] += _precio_a_int(c.get("precio"))
+                else:
+                    meses[mm]["activas"] += 1
+
+    historial_2026 = [meses[m] for m in sorted(meses.keys())]
+
+    return render_template(
+        "historial_2026.html",
+        historial_2026=historial_2026,
+        nombre_barbero=NOMBRE_BARBERO
+    )
 @app.route("/citas_json")
 def citas_json():
     citas = leer_citas()
