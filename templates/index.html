@@ -204,12 +204,14 @@
             <span>🕒 Hora: {{ c.hora }}</span>
             <span>💰 Precio: {{ c.precio }}</span>
             
-            {% if c.servicio != "CITA CANCELADA" and c.servicio != "CITA ATENDIDA" and c.fecha >= hoy_iso %}
-            <form action="/cancelar" method="POST">
-                <input type="hidden" name="id" value="{{ c.id }}">
-                <button type="submit" class="btn-cancelar" onclick="return confirm('¿Seguro que quieres cancelar?')">Cancelar Cita</button>
-            </form>
-            {% endif %}
+            {% if c.servicio != "CITA CANCELADA" and c.servicio != "CITA ATENDIDA" and c.cancelable %}
+<form action="/cancelar" method="POST">
+    <input type="hidden" name="id" value="{{ c.id }}">
+    <button type="submit" class="btn-cancelar" onclick="return confirm('¿Seguro que quieres cancelar?')">
+      Cancelar Cita
+    </button>
+</form>
+{% endif %}
         </div>
         {% else %}
         <p style="text-align: center; opacity: 0.5;">Aún no tienes citas.</p>

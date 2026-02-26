@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, redirect, flash, url_for, jsonify, make_response
 from datetime import date, timedelta, datetime
+from zoneinfo import ZoneInfo
 import os
+TZ = ZoneInfo(os.getenv("TZ", "America/Costa_Rica"))
 import uuid
 import requests
 import time  # anti-duplicados webhook
@@ -91,7 +93,39 @@ def _precio_a_int(valor):
         return int(float(s))
     except:
         return 0
+def _hora_ampm_a_time(hora_str: str):
+    """
+    Convierte '9:00am' o '12:30pm' a datetime.time
+    """
+    if not hora_str:
+        return None
+    s = str(hora_str).strip().lower().replace(" ", "")
+    try:
+        # formato tipo 9:00am / 12:30pm
+        return datetime.strptime(s, "%I:%M%p").time()
+    except:
+        return None
 
+
+def _cita_a_datetime(fecha_str: str, hora_str: str):
+    """
+    Combina fecha YYYY-MM-DD + hora '9:00am' => datetime con timezone CR
+    """
+    if not fecha_str or not hora_str:
+        return None
+    try:
+        t = _hora_ampm_a_time(hora_str)
+        if not t:
+            return None
+        dt = datetime.strptime(str(fecha_str), "%Y-%m-%d")
+        dt = dt.replace(hour=t.hour, minute=t.minute, second=0, microsecond=0)
+        return dt.replace(tzinfo=TZ)
+    except:
+        return None
+
+
+def _now_cr():
+    return datetime.now(TZ)
 
 # =========================
 # Servicios y horas
@@ -470,8 +504,22 @@ def index():
 
     citas_todas = leer_citas()
 
-    # cliente solo ve sus citas
-    citas_cliente = [c for c in citas_todas if str(c.get("cliente_id", "")) == str(cliente_id)]
+    # ✅ Solo citas de este cliente
+    citas_cliente_all = [c for c in citas_todas if str(c.get("cliente_id", "")) == str(cliente_id)]
+
+    # ✅ “Borrar cada mes” = mostrar SOLO citas del mes actual
+    hoy_dt = _now_cr()
+    mes_actual = hoy_dt.strftime("%Y-%m")  # ejemplo 2026-02
+    citas_cliente = [c for c in citas_cliente_all if str(c.get("fecha", "")).startswith(mes_actual)]
+
+    # ✅ Calcular si puede cancelar: hasta 12h después de la hora agendada
+    for c in citas_cliente:
+        cita_dt = _cita_a_datetime(c.get("fecha"), c.get("hora"))
+        if cita_dt:
+            limite = cita_dt + timedelta(hours=12)
+            c["cancelable"] = (hoy_dt <= limite)
+        else:
+            c["cancelable"] = True  # si algo raro pasa, no lo bloqueamos
 
     if request.method == "POST":
         cliente = request.form.get("cliente", "").strip()
@@ -544,16 +592,14 @@ Para cancelar: entra a este link:
         return resp
 
     resp = make_response(render_template(
-    "index.html",
-    servicios=servicios,
-    citas=citas_cliente,
-    cliente_id=cliente_id,
-    numero_barbero=NUMERO_BARBERO,
-    nombre_barbero=NOMBRE_BARBERO,
-    hoy_iso=date.today().strftime("%Y-%m-%d"),
-    hoy_bonito=date.today().strftime("%d %b %Y")
-))
-    
+        "index.html",
+        servicios=servicios,
+        citas=citas_cliente,
+        cliente_id=cliente_id,
+        numero_barbero=NUMERO_BARBERO,
+        nombre_barbero=NOMBRE_BARBERO,
+        hoy_iso=hoy_dt.strftime("%Y-%m-%d")
+    ))
     resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
     return resp
 
@@ -793,7 +839,7 @@ def horas():
     fecha_obj = datetime.strptime(fecha, "%Y-%m-%d")
     dia_semana = fecha_obj.weekday()
 
-    # ✅ Miércoles: barbero no trabaja
+    # ✅ Miércoles: no trabaja
     if dia_semana == 2:
         return jsonify([])
 
@@ -814,6 +860,21 @@ def horas():
     ]
 
     disponibles = [h for h in horas_base if h not in ocupadas]
+
+    # ✅ Bloquear horas que YA pasaron si la fecha es HOY
+    hoy_str = _now_cr().strftime("%Y-%m-%d")
+    if str(fecha) == hoy_str:
+        ahora = _now_cr()
+        ahora_min = ahora.hour * 60 + ahora.minute
+
+        def _hora_a_min(h):
+            t = _hora_ampm_a_time(h)
+            if not t:
+                return -1
+            return t.hour * 60 + t.minute
+
+        disponibles = [h for h in disponibles if _hora_a_min(h) > ahora_min]
+
     return jsonify(disponibles)
 
 
