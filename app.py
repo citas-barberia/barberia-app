@@ -48,6 +48,9 @@ def enviar_whatsapp(to_numero: str, mensaje: str) -> bool:
         print("⚠️ Faltan WHATSAPP_TOKEN o PHONE_NUMBER_ID en variables de entorno")
         return False
 
+    # normalizar numero (sin + ni espacios)
+    to_numero = str(to_numero).replace("+", "").replace(" ", "").strip()
+
     url = f"https://graph.facebook.com/v22.0/{PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {WHATSAPP_TOKEN}",
@@ -62,9 +65,14 @@ def enviar_whatsapp(to_numero: str, mensaje: str) -> bool:
 
     try:
         r = requests.post(url, headers=headers, json=data, timeout=15)
+
+        # ✅ LOG SIEMPRE (para saber si realmente está enviando)
+        print("📤 WhatsApp -> to:", to_numero, "| status:", r.status_code)
+
         if r.status_code >= 400:
-            print("❌ Error WhatsApp:", r.status_code, r.text)
+            print("❌ Error WhatsApp:", r.text)
             return False
+
         return True
     except Exception as e:
         print("❌ Error enviando WhatsApp:", e)
