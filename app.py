@@ -18,7 +18,7 @@ NUMERO_BARBERO = os.getenv("NUMERO_BARBERO", "50660840460")
 DOMINIO = os.getenv("DOMINIO", "https://barberia-app-1.onrender.com")
 
 # ✅ Nombre del barbero
-NOMBRE_BARBERO = os.getenv("NOMBRE_BARBERO", "Erickson")
+NOMBRE_BARBERO = os.getenv("NOMBRE_BARBERO", "Junior")
 
 # ✅ Clave para entrar al panel del barbero
 CLAVE_BARBERO = os.getenv("CLAVE_BARBERO", "1234")
@@ -139,10 +139,12 @@ def _now_cr():
 # Servicios y horas
 # =========================
 servicios = {
-    "Corte de cabello": 5000,
-    "Corte + barba": 7000,
-    "Solo barba": 5000,
-    "Solo cejas": 2000,
+    "Corte Difuminado": 5000,
+    "Corte y Barba": 7000,
+    "Corte Clasico": 4500,
+    "Cejas": 1500,
+    "Marcado y Barba": 3500,
+    "Corte Niño": 4500,
 }
 
 
@@ -468,12 +470,13 @@ def webhook():
         mensaje = f"""Hola 👋 Bienvenido a Barbería {NOMBRE_BARBERO} 💈
 
 🕒 Horario de atención:
-• Lunes a sábado: 9:00am – 7:30pm
-• Miércoles: {NOMBRE_BARBERO} no labora (la barbería sigue abierta)
-• Domingo: 9:00am – 3:00pm
+• Lunes a Jueves: 9:00am – 8:00pm
+• Viernes y Sábado: 8:00am – 8:00pm
+• Domingo: 9:00am – 4:00pm
 
 Para agendar tu cita entra aquí:
 {link}
+
 
 (Guarda este link para cancelar luego)
 """
@@ -847,15 +850,15 @@ def horas():
     fecha_obj = datetime.strptime(fecha, "%Y-%m-%d")
     dia_semana = fecha_obj.weekday()
 
-    # ✅ Miércoles: no trabaja
-    if dia_semana == 2:
-        return jsonify([])
+    # Lógica de Horarios de Junior
+    # lunes=0, martes=1, miercoles=2, jueves=3, viernes=4, sabado=5, domingo=6
 
-    # ✅ Domingo: 9:00am a 3:00pm
-    if dia_semana == 6:
-        horas_base = generar_horas(9, 0, 15, 0)
-    else:
-        horas_base = generar_horas(9, 0, 19, 30)
+    if dia_semana <= 3: # Lunes a Jueves (0 a 3)
+        horas_base = generar_horas(9, 0, 20, 0) # 9am a 8pm
+    elif dia_semana == 4 or dia_semana == 5: # Viernes y Sábado
+        horas_base = generar_horas(8, 0, 20, 0) # 8am a 8pm
+    else: # Domingo
+        horas_base = generar_horas(9, 0, 16, 0) # 9am a 4pm
 
     barbero_norm = normalizar_barbero(barbero)
 
