@@ -578,23 +578,21 @@ Precio: ₡{precio}
         if es_numero_whatsapp(cliente_id):
             link = f"{DOMINIO}/?cliente_id={cliente_id}"
 
-            msg_cliente = f"""✅ Cita confirmada en Barbería {NOMBRE_BARBERO} 💈
+            msg_cliente = f"""✅ *¡Cita Confirmada!* 💈
 
-Cliente: {cliente}
-Barbero: {barbero}
-Servicio: {servicio}
-Fecha: {fecha}
-Hora: {hora}
-Total: ₡{precio}
+Hola *{cliente}*, tu espacio con *Junior* ha sido reservado con éxito.
 
-🕒 Horario:
-Lunes a sábado: 9:00am – 7:30pm
-Miércoles: {NOMBRE_BARBERO} no labora (la barbería sigue abierta)
-Domingo: 9:00am – 3:00pm
+*Detalles de tu cita:*
+✂️ *Servicio:* {servicio}
+📅 *Fecha:* {fecha}
+🕒 *Hora:* {hora}
+💰 *Total a pagar:* ₡{precio}
 
-Para cancelar: entra a este link:
+
+*Recordatorio:* Si no puedes asistir, por favor cancela con tiempo en el siguiente link para liberar el espacio:
 {link}
-"""
+
+¡Te esperamos! 🔥"""
             enviar_whatsapp(cliente_id, msg_cliente)
 
         flash("Cita agendada exitosamente")
