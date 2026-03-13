@@ -503,9 +503,8 @@ def ping():
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    # 1. Intentamos agarrar el ID de la URL
+    # 1. Intentamos agarrar el ID de la URL o Cookie
     cliente_id_url = request.args.get("cliente_id")
-    # 2. Intentamos agarrar el ID de la "memoria" del navegador (Cookie)
     cliente_id_cookie = request.cookies.get("cliente_id")
 
     if cliente_id_url:
@@ -513,53 +512,36 @@ def index():
     elif cliente_id_cookie:
         cliente_id = str(cliente_id_cookie).strip()
     else:
-        # 3. SI NO HAY NADA, creamos uno nuevo (Generalizado)
         cliente_id = str(uuid.uuid4())
 
+    hoy_dt = _now_cr()
     citas_todas = leer_citas()
 
-    # ✅ Solo citas de este cliente
-    citas_cliente_all = [c for c in citas_todas if str(c.get("cliente_id", "")) == str(cliente_id)]
-
-    # ✅ “Borrar cada mes” = mostrar SOLO citas del mes actual
-    hoy_dt = _now_cr()
-    mes_actual = hoy_dt.strftime("%Y-%m")  # ejemplo 2026-02
-    citas_cliente = [c for c in citas_cliente_all if str(c.get("fecha", "")).startswith(mes_actual)]
-
-    # ✅ Calcular si puede cancelar: hasta 12h después de la hora agendada
-    for c in citas_cliente:
-        cita_dt = _cita_a_datetime(c.get("fecha"), c.get("hora"))
-        if cita_dt:
-            limite = cita_dt + timedelta(hours=12)
-            c["cancelable"] = (hoy_dt <= limite)
-        else:
-            c["cancelable"] = True  # si algo raro pasa, no lo bloqueamos
+    # Filtrar citas del cliente para mostrar en la web
+    mes_actual = hoy_dt.strftime("%Y-%m")
+    citas_cliente = [c for c in citas_todas if str(c.get("cliente_id", "")) == str(cliente_id) and str(c.get("fecha", "")).startswith(mes_actual)]
 
     if request.method == "POST":
         cliente = request.form.get("cliente", "").strip()
-        
-        # --- PROCESO DEL TELÉFONO ---
         tel_raw = request.form.get("telefono_cliente", "").strip()
-        # Si el cliente solo puso 8 números, le pegamos el 506
+        
+        # Le pegamos el 506 si vienen solo 8 dígitos
         if len(tel_raw) == 8:
             telefono_cliente = "506" + tel_raw
         else:
             telefono_cliente = tel_raw
-        
-        # IMPORTANTE: No vuelvas a declarar telefono_cliente abajo para no borrar el 506
         
         barbero_raw = request.form.get("barbero", "").strip()
         servicio = request.form.get("servicio", "").strip()
         fecha = request.form.get("fecha", "").strip()
         hora = request.form.get("hora", "").strip()
 
-        # El cliente_id ahora será el teléfono para que el link de cancelación sirva
+        # El ID de seguimiento ahora será el teléfono
         cliente_id = telefono_cliente 
-
         barbero = normalizar_barbero(barbero_raw)
         precio = str(servicios.get(servicio, 0))
 
-        # ... (Aquí va tu lógica de conflicto/validación que ya tienes) ...
+        # Validar si está ocupado
         conflict = any(
             normalizar_barbero(c.get("barbero", "")) == barbero
             and str(c.get("fecha", "")) == fecha
@@ -570,106 +552,26 @@ def index():
 
         if conflict:
             flash("La hora seleccionada ya está ocupada. Por favor elige otra.")
-            resp = make_response(redirect(url_for("index", cliente_id=cliente_id)))
-            resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
-            return resp
+            return redirect(url_for("index", cliente_id=cliente_id))
 
+        # Guardar la cita
         id_cita = str(uuid.uuid4())
         guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
 
-        # 1. MENSAJE AL BARBERO (Junior)
-        msg_barbero = f"💈 Nueva cita agendada\n\nCliente: {cliente}\nBarbero: {barbero}\nServicio: {servicio}\nFecha: {fecha}\nHora: {hora}\nPrecio: ₡{precio}"
+        # 1. Avisar a Junior (Esto sí llega porque su número es fijo)
+        msg_barbero = f"💈 Nueva cita agendada\n\nCliente: {cliente}\nServicio: {servicio}\nFecha: {fecha}\nHora: {hora}\nPrecio: ₡{precio}"
         enviar_whatsapp(NUMERO_BARBERO, msg_barbero)
 
-        # 2. MENSAJE AL CLIENTE (Confirmación)
-        if es_numero_whatsapp(telefono_cliente):
-            link = f"{DOMINIO}/?cliente_id={telefono_cliente}"
-            msg_cliente = f"""✅ *¡Cita Confirmada!* 💈
+        # 2. Crear el link de WhatsApp para el cliente (Solución al bloqueo de Meta)
+        import urllib.parse
+        msg_cliente = f"✅ *¡Cita Confirmada!* 💈\n\nHola *{cliente}*, mi espacio para *{servicio}* el {fecha} a las {hora} está reservado.\n\nPara gestionar o cancelar:\n{DOMINIO}/?cliente_id={telefono_cliente}"
+        texto_link = urllib.parse.quote(msg_cliente)
+        link_wa = f"https://wa.me/{telefono_cliente}?text={texto_link}"
 
-Hola *{cliente}*, tu espacio con *Junior* ha sido reservado con éxito.
+        # 3. Mandar a la página de éxito
+        return render_template("confirmacion.html", link_wa=link_wa, cliente=cliente)
 
-*Detalles de tu cita:*
-✂️ *Servicio:* {servicio}
-📅 *Fecha:* {fecha}
-🕒 *Hora:* {hora}
-💰 *Total a pagar:* ₡{precio}
-
-Para gestionar o cancelar:
-{link}
-
-¡Te esperamos! 🔥"""
-            # Enviamos al número que el cliente puso en el formulario
-            enviar_whatsapp(telefono_cliente, msg_cliente)
-
-        flash("Cita agendada exitosamente")
-        resp = make_response(redirect(url_for("index", cliente_id=cliente_id)))
-        resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
-        return resp
-
-        id_cita = str(uuid.uuid4())
-        guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
-
-        msg_barbero = f"""💈 Nueva cita agendada
-
-Cliente: {cliente}
-Barbero: {barbero}
-Servicio: {servicio}
-Fecha: {fecha}
-Hora: {hora}
-Precio: ₡{precio}
-"""
-        enviar_whatsapp(NUMERO_BARBERO, msg_barbero)
-
-        if es_numero_whatsapp(cliente_id):
-            link = f"{DOMINIO}/?cliente_id={cliente_id}"
-
-            msg_cliente = f"""✅ *¡Cita Confirmada!* 💈
-
-Hola *{cliente}*, tu espacio con *Junior* ha sido reservado con éxito.
-
-*Detalles de tu cita:*
-✂️ *Servicio:* {servicio}
-📅 *Fecha:* {fecha}
-🕒 *Hora:* {hora}
-💰 *Total a pagar:* ₡{precio}
-
-
-*Recordatorio:* Si no puedes asistir, por favor cancela con tiempo en el siguiente link para liberar el espacio:
-{link}
-
-¡Te esperamos! 🔥"""
-            enviar_whatsapp(cliente_id, msg_cliente)
-# ... después de enviar_whatsapp(NUMERO_BARBERO, msg_barbero) ...
-
-        # ✅ ENVIAR CONFIRMACIÓN AL CLIENTE (Pégalo aquí)
-        if es_numero_whatsapp(telefono_cliente):
-            cliente_id = telefono_cliente 
-            link = f"{DOMINIO}/?cliente_id={cliente_id}"
-
-            msg_cliente = f"""✅ *¡Cita Confirmada!* 💈
-
-Hola *{cliente}*, tu espacio con *Junior* ha sido reservado con éxito.
-
-*Detalles de tu cita:*
-✂️ *Servicio:* {servicio}
-📅 *Fecha:* {fecha}
-🕒 *Hora:* {hora}
-💰 *Total a pagar:* ₡{precio}
-
-Para gestionar o cancelar:
-{link}
-
-¡Te esperamos! 🔥"""
-            enviar_whatsapp(telefono_cliente, msg_cliente)
-
-        flash("Cita agendada exitosamente")
-        resp = make_response(redirect(url_for("index", cliente_id=cliente_id)))
-        # ... resto del código ...
-        flash("Cita agendada exitosamente")
-        resp = make_response(redirect(url_for("index", cliente_id=cliente_id)))
-        resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
-        return resp
-
+    # Carga normal de la página (GET)
     resp = make_response(render_template(
         "index.html",
         servicios=servicios,
