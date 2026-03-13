@@ -1,7 +1,11 @@
 const CACHE_NAME = "barberia-citas-v1";
 const ASSETS = [
+  "/",
   "/barbero",
-  "/static/manifest.json"
+  "/static/manifest.json",
+  "/static/icons/icon-192.png",
+  "/static/icons/icon-512.png",
+  "/static/icons/apple-touch-icon.png"
 ];
 
 self.addEventListener("install", (event) => {

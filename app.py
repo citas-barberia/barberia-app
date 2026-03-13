@@ -537,6 +537,12 @@ def index():
 
     if request.method == "POST":
         cliente = request.form.get("cliente", "").strip()
+        tel_raw = request.form.get("telefono_cliente", "").strip()
+        # Si el cliente solo puso 8 números, le pegamos el 506
+        if len(tel_raw) == 8:
+            telefono_cliente = "506" + tel_raw
+        else:
+            telefono_cliente = tel_raw
         cliente = request.form.get("cliente", "").strip()
         # CAPTURAMOS EL TELÉFONO AQUÍ (Línea 541 aprox)
         telefono_cliente = request.form.get("telefono_cliente", "").strip()

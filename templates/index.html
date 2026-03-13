@@ -4,7 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Upperline Studio | Junior The Barber</title>
-    
+    <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0b0f19">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/icon-16.png">
     
@@ -163,9 +168,20 @@
             <input type="text" name="cliente" placeholder="Escribe tu nombre completo" required>
         </div>
         <div class="form-group">
-    <label>Tu Teléfono (WhatsApp):</label>
-    <input type="tel" name="telefono_cliente" placeholder="Ej: 50688887777" required>
-</div>
+            <label>Tu WhatsApp:</label>
+            <div style="display: flex; align-items: center; background: #242425; border: 1px solid #333; border-radius: 14px; padding-left: 15px;">
+                <span style="color: #D4AF37; font-weight: bold; margin-right: 5px;">+506</span>
+                <input type="tel" 
+                       name="telefono_cliente" 
+                       placeholder="88887777" 
+                       required 
+                       pattern="[0-9]{8}" 
+                       maxlength="8"
+                       title="Por favor ingresa los 8 dígitos de tu número"
+                       style="border: none; background: transparent; padding: 16px 10px 16px 0; width: 100%; outline: none; color: #fff; font-size: 16px;">
+            </div>
+            <small style="font-size: 11px; color: #888; margin-top: 5px; display: block;">Ingresa solo los 8 dígitos de tu celular.</small>
+        </div>
 
         <div class="form-group">
             <label>Servicio:</label>
