@@ -537,7 +537,9 @@ def index():
 
     if request.method == "POST":
         cliente = request.form.get("cliente", "").strip()
-
+        cliente = request.form.get("cliente", "").strip()
+        # CAPTURAMOS EL TELÉFONO AQUÍ (Línea 541 aprox)
+        telefono_cliente = request.form.get("telefono_cliente", "").strip()
         barbero_raw = request.form.get("barbero", "").strip()
         servicio = request.form.get("servicio", "").strip()
         fecha = request.form.get("fecha", "").strip()
@@ -597,7 +599,32 @@ Hola *{cliente}*, tu espacio con *Junior* ha sido reservado con éxito.
 
 ¡Te esperamos! 🔥"""
             enviar_whatsapp(cliente_id, msg_cliente)
+# ... después de enviar_whatsapp(NUMERO_BARBERO, msg_barbero) ...
 
+        # ✅ ENVIAR CONFIRMACIÓN AL CLIENTE (Pégalo aquí)
+        if es_numero_whatsapp(telefono_cliente):
+            cliente_id = telefono_cliente 
+            link = f"{DOMINIO}/?cliente_id={cliente_id}"
+
+            msg_cliente = f"""✅ *¡Cita Confirmada!* 💈
+
+Hola *{cliente}*, tu espacio con *Junior* ha sido reservado con éxito.
+
+*Detalles de tu cita:*
+✂️ *Servicio:* {servicio}
+📅 *Fecha:* {fecha}
+🕒 *Hora:* {hora}
+💰 *Total a pagar:* ₡{precio}
+
+Para gestionar o cancelar:
+{link}
+
+¡Te esperamos! 🔥"""
+            enviar_whatsapp(telefono_cliente, msg_cliente)
+
+        flash("Cita agendada exitosamente")
+        resp = make_response(redirect(url_for("index", cliente_id=cliente_id)))
+        # ... resto del código ...
         flash("Cita agendada exitosamente")
         resp = make_response(redirect(url_for("index", cliente_id=cliente_id)))
         resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
