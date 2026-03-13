@@ -537,27 +537,29 @@ def index():
 
     if request.method == "POST":
         cliente = request.form.get("cliente", "").strip()
+        
+        # --- PROCESO DEL TELÉFONO ---
         tel_raw = request.form.get("telefono_cliente", "").strip()
         # Si el cliente solo puso 8 números, le pegamos el 506
         if len(tel_raw) == 8:
             telefono_cliente = "506" + tel_raw
         else:
             telefono_cliente = tel_raw
-        cliente = request.form.get("cliente", "").strip()
-        # CAPTURAMOS EL TELÉFONO AQUÍ (Línea 541 aprox)
-        telefono_cliente = request.form.get("telefono_cliente", "").strip()
+        
+        # IMPORTANTE: No vuelvas a declarar telefono_cliente abajo para no borrar el 506
+        
         barbero_raw = request.form.get("barbero", "").strip()
         servicio = request.form.get("servicio", "").strip()
         fecha = request.form.get("fecha", "").strip()
         hora = request.form.get("hora", "").strip()
 
-        cliente_id_form = request.form.get("cliente_id")
-        if cliente_id_form:
-            cliente_id = str(cliente_id_form).strip()
+        # El cliente_id ahora será el teléfono para que el link de cancelación sirva
+        cliente_id = telefono_cliente 
 
         barbero = normalizar_barbero(barbero_raw)
         precio = str(servicios.get(servicio, 0))
 
+        # ... (Aquí va tu lógica de conflicto/validación que ya tienes) ...
         conflict = any(
             normalizar_barbero(c.get("barbero", "")) == barbero
             and str(c.get("fecha", "")) == fecha
@@ -571,6 +573,38 @@ def index():
             resp = make_response(redirect(url_for("index", cliente_id=cliente_id)))
             resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
             return resp
+
+        id_cita = str(uuid.uuid4())
+        guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
+
+        # 1. MENSAJE AL BARBERO (Junior)
+        msg_barbero = f"💈 Nueva cita agendada\n\nCliente: {cliente}\nBarbero: {barbero}\nServicio: {servicio}\nFecha: {fecha}\nHora: {hora}\nPrecio: ₡{precio}"
+        enviar_whatsapp(NUMERO_BARBERO, msg_barbero)
+
+        # 2. MENSAJE AL CLIENTE (Confirmación)
+        if es_numero_whatsapp(telefono_cliente):
+            link = f"{DOMINIO}/?cliente_id={telefono_cliente}"
+            msg_cliente = f"""✅ *¡Cita Confirmada!* 💈
+
+Hola *{cliente}*, tu espacio con *Junior* ha sido reservado con éxito.
+
+*Detalles de tu cita:*
+✂️ *Servicio:* {servicio}
+📅 *Fecha:* {fecha}
+🕒 *Hora:* {hora}
+💰 *Total a pagar:* ₡{precio}
+
+Para gestionar o cancelar:
+{link}
+
+¡Te esperamos! 🔥"""
+            # Enviamos al número que el cliente puso en el formulario
+            enviar_whatsapp(telefono_cliente, msg_cliente)
+
+        flash("Cita agendada exitosamente")
+        resp = make_response(redirect(url_for("index", cliente_id=cliente_id)))
+        resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
+        return resp
 
         id_cita = str(uuid.uuid4())
         guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
