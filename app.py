@@ -626,6 +626,12 @@ Si deseas agendar de nuevo, entra al link.
         enviar_whatsapp(cliente_id, msg_cliente)
 
     flash("Cita cancelada correctamente")
+    
+    # Si el barbero está autenticado, lo devolvemos a su panel
+    if barbero_autenticado():
+        return redirect(url_for("barbero"))
+        
+    # Si es el cliente, lo devolvemos al index normal
     resp = make_response(redirect(url_for("index", cliente_id=cliente_id)))
     resp.set_cookie("cliente_id", cliente_id, max_age=60 * 60 * 24 * 365)
     return resp

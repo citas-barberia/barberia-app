@@ -12,7 +12,10 @@
   <meta name="theme-color" content="#0b0f19">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/icon-16.png">
   <style>
@@ -221,6 +224,17 @@
     <div id="cards-container" class="citas-mobile-container"></div>
 
     <div class="table-wrap">
+      <td>
+    {% if cita.servicio != "CITA CANCELADA" and cita.servicio != "CITA ATENDIDA" %}
+        <form action="{{ url_for('cancelar') }}" method="POST" style="display:inline;" 
+              onsubmit="return confirm('¿Estás seguro de que quieres cancelar esta cita?');">
+            <input type="hidden" name="id" value="{{ cita.id }}">
+            <button type="submit" style="background-color: #ff4444; color: white; border: none; padding: 5px 10px; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                CANCELAR
+            </button>
+        </form>
+    {% endif %}
+</td>
       <table>
         <thead>
           <tr>
