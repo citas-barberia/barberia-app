@@ -225,7 +225,7 @@
 
     <div class="table-wrap">
       <td>
-    {% if cita.servicio != "CITA CANCELADA" and cita.servicio != "CITA ATENDIDA" %}
+    {% if c.servicio != "CITA CANCELADA" and c.servicio != "CITA ATENDIDA" %}
         <form action="{{ url_for('cancelar') }}" method="POST" style="display:inline;" 
               onsubmit="return confirm('¿Estás seguro de que quieres cancelar esta cita?');">
             <input type="hidden" name="id" value="{{ cita.id }}">
