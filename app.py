@@ -503,7 +503,9 @@ def ping():
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    # 1. Intentamos agarrar el ID de la URL
     cliente_id_url = request.args.get("cliente_id")
+    # 2. Intentamos agarrar el ID de la "memoria" del navegador (Cookie)
     cliente_id_cookie = request.cookies.get("cliente_id")
 
     if cliente_id_url:
@@ -511,6 +513,7 @@ def index():
     elif cliente_id_cookie:
         cliente_id = str(cliente_id_cookie).strip()
     else:
+        # 3. SI NO HAY NADA, creamos uno nuevo (Generalizado)
         cliente_id = str(uuid.uuid4())
 
     citas_todas = leer_citas()
