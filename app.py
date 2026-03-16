@@ -289,26 +289,34 @@ def _render_panel_barbero():
 
 @app.route("/horas")
 def horas():
-    fecha, barbero = request.args.get("fecha"), request.args.get("barbero")
-    if not fecha or not barbero: return jsonify([])
+    # 1. Capturamos los datos que envía el cliente
+    fecha = request.args.get('fecha')
+    barbero = request.args.get('barbero')
     
-    fecha_obj = datetime.strptime(fecha, "%Y-%m-%d")
-    dia = fecha_obj.weekday()
-    if dia <= 3: horas_base = generar_horas(9, 0, 20, 0)
-    elif dia <= 5: horas_base = generar_horas(8, 0, 20, 0)
-    else: horas_base = generar_horas(9, 0, 16, 0)
+    # 2. Definimos las horas de trabajo (puedes quitar o poner más aquí)
+    horas_base = ["08:00 AM", "08:30 AM", "09:00 AM", "09:30 AM", "10:00 AM", 
+                  "10:30 AM", "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM", 
+                  "01:00 PM", "01:30 PM", "02:00 PM", "02:30 PM", "03:00 PM", 
+                  "03:30 PM", "04:00 PM", "04:30 PM", "05:00 PM", "05:30 PM", 
+                  "06:00 PM", "06:30 PM", "07:00 PM"]
 
+    # 3. Filtramos las citas que ya están tomadas
     barbero_norm = normalizar_barbero(barbero)
     citas = leer_citas()
-    ocupadas = [c.get("hora") for c in citas if normalizar_barbero(c.get("barbero", "")) == barbero_norm and str(c.get("fecha")) == str(fecha) and c.get("servicio") != "CITA CANCELADA"]
+    ocupadas = [c.get("hora") for c in citas if normalizar_barbero(c.get("barbero", "")) == barbero_norm]
     
+    # 4. Aplicamos el margen de 30 min para Junior
+    MARGEN_SEGURIDAD = 30
     disponibles = [h for h in horas_base if h not in ocupadas]
-    # Bloquear horas pasadas si es hoy
+    
     if str(fecha) == _now_cr().strftime("%Y-%m-%d"):
-        ahora_min = _now_cr().hour * 60 + _now_cr().minute
-        disponibles = [h for h in disponibles if (_hora_ampm_a_time(h).hour * 60 + _hora_ampm_a_time(h).minute) > ahora_min]
+        tiempo_limite = (_now_cr().hour * 60 + _now_cr().minute) + MARGEN_SEGURIDAD
+        disponibles = [
+            h for h in disponibles 
+            if (_hora_ampm_a_time(h).hour * 60 + _hora_ampm_a_time(h).minute) > tiempo_limite
+        ]
+        
     return jsonify(disponibles)
-
 @app.route("/citas_json")
 def citas_json():
     return jsonify({"citas": leer_citas()})
