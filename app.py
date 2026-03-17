@@ -115,7 +115,6 @@ def leer_citas_txt():
             for linea in f:
                 if not linea.strip(): continue
                 c = linea.strip().split("|")
-                # Soportamos el nuevo campo duracion (9 columnas ahora)
                 if len(c) >= 8:
                     dur = c[8] if len(c) == 9 else "30"
                     citas.append({
@@ -168,7 +167,6 @@ def guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha,
     else: 
         guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion)
 
-# Funciones de actualización y búsqueda se mantienen similares...
 def _reescribir_citas_txt_actualizando_servicio(id_cita, nuevo_servicio):
     citas = leer_citas_txt()
     with open("citas.txt", "w", encoding="utf-8") as f:
@@ -218,14 +216,13 @@ def index():
         fecha = request.form.get("fecha", "").strip()
         hora = request.form.get("hora", "").strip()
 
-        # LOGICA DE DURACIÓN
+        # DURACIÓN DINÁMICA
         duracion = 60 if servicio == "Corte y Barba" else 30
 
         cliente_id = telefono_cliente 
         barbero = normalizar_barbero(barbero_raw)
         precio = str(servicios.get(servicio, 0))
 
-        # El conflicto ahora se valida en la ruta /horas, pero aquí dejamos una básica
         conflict = any(normalizar_barbero(c.get("barbero", "")) == barbero and str(c.get("fecha")) == fecha and str(c.get("hora")) == hora and c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"] for c in citas_todas)
 
         if conflict:
@@ -251,16 +248,16 @@ def horas():
     fecha = request.args.get('fecha')
     barbero = request.args.get('barbero')
     
+    # LISTA EXTENDIDA HASTA LAS 8:00 PM
     horas_base = ["08:00 AM", "08:30 AM", "09:00 AM", "09:30 AM", "10:00 AM", 
                   "10:30 AM", "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM", 
                   "01:00 PM", "01:30 PM", "02:00 PM", "02:30 PM", "03:00 PM", 
                   "03:30 PM", "04:00 PM", "04:30 PM", "05:00 PM", "05:30 PM", 
-                  "06:00 PM", "06:30 PM", "07:00 PM"]
+                  "06:00 PM", "06:30 PM", "07:00 PM", "07:30 PM", "08:00 PM"]
 
     barbero_norm = normalizar_barbero(barbero)
     citas = leer_citas()
     
-    # 1. Identificamos minutos ocupados incluyendo duración
     minutos_bloqueados = []
     for c in citas:
         if normalizar_barbero(c.get("barbero", "")) == barbero_norm and c.get("fecha") == fecha and c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]:
@@ -268,11 +265,9 @@ def horas():
             if h_dt:
                 min_inicio = h_dt.hour * 60 + h_dt.minute
                 dur = int(c.get("duracion", 30))
-                # Bloqueamos cada intervalo de 30 min que cubra la duración
                 for offset in range(0, dur, 30):
                     minutos_bloqueados.append(min_inicio + offset)
 
-    # 2. Filtramos horas base
     disponibles = []
     for h in horas_base:
         h_dt = _hora_ampm_a_time(h)
@@ -281,7 +276,7 @@ def horas():
             if min_actual not in minutos_bloqueados:
                 disponibles.append(h)
     
-    # 3. Margen de seguridad de 30 min para Junior
+    # MARGEN DE 30 MINUTOS
     MARGEN_SEGURIDAD = 30
     if str(fecha) == _now_cr().strftime("%Y-%m-%d"):
         tiempo_ahora = (_now_cr().hour * 60 + _now_cr().minute) + MARGEN_SEGURIDAD
