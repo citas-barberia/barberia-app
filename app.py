@@ -66,17 +66,9 @@ def _precio_a_int(valor):
 def _hora_ampm_a_time(hora_str: str):
     if not hora_str: return None
     s = str(hora_str).strip().lower().replace(" ", "")
-    try: return datetime.strptime(s, "%I:%M%p").time()
-    except: return None
-
-def _cita_a_datetime(fecha_str: str, hora_str: str):
-    if not fecha_str or not hora_str: return None
-    try:
-        t = _hora_ampm_a_time(hora_str)
-        if not t: return None
-        dt = datetime.strptime(str(fecha_str), "%Y-%m-%d")
-        dt = dt.replace(hour=t.hour, minute=t.minute, second=0, microsecond=0)
-        return dt.replace(tzinfo=TZ)
+    try: 
+        if ":" not in s: return None
+        return datetime.strptime(s, "%I:%M%p").time()
     except: return None
 
 def _now_cr():
@@ -93,19 +85,6 @@ servicios = {
     "Marcado y Barba": 3500,
     "Corte Niño": 4500,
 }
-
-def generar_horas(inicio_h, inicio_m, fin_h, fin_m):
-    horas = []
-    t, fin = inicio_h * 60 + inicio_m, fin_h * 60 + fin_m
-    while t <= fin:
-        h, m = t // 60, t % 60
-        sufijo = "am" if h < 12 else "pm"
-        h12 = 12 if h % 12 == 0 else h % 12
-        horas.append(f"{h12}:{m:02d}{sufijo}")
-        t += 30
-    return horas
-
-HORAS_BASE = generar_horas(8, 0, 19, 30)
 
 # =========================
 # SUPABASE & TXT Logic
@@ -136,34 +115,42 @@ def leer_citas_txt():
             for linea in f:
                 if not linea.strip(): continue
                 c = linea.strip().split("|")
-                if len(c) == 8:
-                    citas.append({"id": c[0], "cliente": c[1], "cliente_id": c[2], "barbero": c[3], "servicio": c[4], "precio": c[5], "fecha": c[6], "hora": c[7]})
+                # Soportamos el nuevo campo duracion (9 columnas ahora)
+                if len(c) >= 8:
+                    dur = c[8] if len(c) == 9 else "30"
+                    citas.append({
+                        "id": c[0], "cliente": c[1], "cliente_id": c[2], 
+                        "barbero": c[3], "servicio": c[4], "precio": c[5], 
+                        "fecha": c[6], "hora": c[7], "duracion": dur
+                    })
     except FileNotFoundError: pass
     return citas
 
-def guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora):
+def guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion):
     with open("citas.txt", "a", encoding="utf-8") as f:
-        f.write(f"{id_cita}|{cliente}|{cliente_id}|{barbero}|{servicio}|{precio}|{fecha}|{hora}\n")
-
-def _reescribir_citas_txt_actualizando_servicio(id_cita, nuevo_servicio):
-    citas = leer_citas_txt()
-    with open("citas.txt", "w", encoding="utf-8") as f:
-        for c in citas:
-            cid = c.get("id") or str(uuid.uuid4())
-            srv = nuevo_servicio if str(cid) == str(id_cita) else c['servicio']
-            f.write(f"{cid}|{c['cliente']}|{c['cliente_id']}|{c['barbero']}|{srv}|{c['precio']}|{c['fecha']}|{c['hora']}\n")
+        f.write(f"{id_cita}|{cliente}|{cliente_id}|{barbero}|{servicio}|{precio}|{fecha}|{hora}|{duracion}\n")
 
 def leer_citas_db():
     url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/citas"
     data = _supabase_request("GET", url, params={"select": "*"})
     if data is None: return None
-    return [{"id": r.get("id"), "cliente": r.get("cliente", ""), "cliente_id": r.get("cliente_id", ""), "barbero": r.get("barbero", ""), "servicio": r.get("servicio", ""), "precio": str(r.get("precio", "")), "fecha": str(r.get("fecha", "")), "hora": str(r.get("hora", ""))} for r in data]
+    return [{
+        "id": r.get("id"), "cliente": r.get("cliente", ""), 
+        "cliente_id": r.get("cliente_id", ""), "barbero": r.get("barbero", ""), 
+        "servicio": r.get("servicio", ""), "precio": str(r.get("precio", "")), 
+        "fecha": str(r.get("fecha", "")), "hora": str(r.get("hora", "")),
+        "duracion": str(r.get("duracion", "30"))
+    } for r in data]
 
-def guardar_cita_db(cliente, cliente_id, barbero, servicio, precio, fecha, hora):
+def guardar_cita_db(cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion):
     url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/citas"
-    body = {"cliente": cliente, "cliente_id": str(cliente_id), "barbero": barbero, "servicio": servicio, "precio": int(precio), "fecha": fecha, "hora": hora}
+    body = {
+        "cliente": cliente, "cliente_id": str(cliente_id), "barbero": barbero, 
+        "servicio": servicio, "precio": int(precio), "fecha": fecha, 
+        "hora": hora, "duracion": int(duracion)
+    }
     res = _supabase_request("POST", url, json_body=body, extra_headers={"Prefer": "return=minimal"})
-    return res is not None or True
+    return res is not None
 
 def leer_citas():
     if USAR_SUPABASE:
@@ -171,13 +158,24 @@ def leer_citas():
         if data is not None: return data
     return leer_citas_txt()
 
-def guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora):
+def guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion):
     if USAR_SUPABASE:
         try:
-            if not guardar_cita_db(cliente, cliente_id, barbero, servicio, precio, fecha, hora):
-                guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
-        except: guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
-    else: guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
+            if not guardar_cita_db(cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion):
+                guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion)
+        except: 
+            guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion)
+    else: 
+        guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion)
+
+# Funciones de actualización y búsqueda se mantienen similares...
+def _reescribir_citas_txt_actualizando_servicio(id_cita, nuevo_servicio):
+    citas = leer_citas_txt()
+    with open("citas.txt", "w", encoding="utf-8") as f:
+        for c in citas:
+            cid = c.get("id")
+            srv = nuevo_servicio if str(cid) == str(id_cita) else c['servicio']
+            f.write(f"{cid}|{c['cliente']}|{c['cliente_id']}|{c['barbero']}|{srv}|{c['precio']}|{c['fecha']}|{c['hora']}|{c.get('duracion','30')}\n")
 
 def cancelar_cita_por_id(id_cita):
     if USAR_SUPABASE:
@@ -220,24 +218,26 @@ def index():
         fecha = request.form.get("fecha", "").strip()
         hora = request.form.get("hora", "").strip()
 
+        # LOGICA DE DURACIÓN
+        duracion = 60 if servicio == "Corte y Barba" else 30
+
         cliente_id = telefono_cliente 
         barbero = normalizar_barbero(barbero_raw)
         precio = str(servicios.get(servicio, 0))
 
-        conflict = any(normalizar_barbero(c.get("barbero", "")) == barbero and str(c.get("fecha")) == fecha and str(c.get("hora")) == hora and c.get("servicio") != "CITA CANCELADA" for c in citas_todas)
+        # El conflicto ahora se valida en la ruta /horas, pero aquí dejamos una básica
+        conflict = any(normalizar_barbero(c.get("barbero", "")) == barbero and str(c.get("fecha")) == fecha and str(c.get("hora")) == hora and c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"] for c in citas_todas)
 
         if conflict:
             flash("La hora seleccionada ya está ocupada.")
             return redirect(url_for("index", cliente_id=cliente_id))
 
         id_cita = str(uuid.uuid4())
-        guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora)
+        guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion)
 
-        # Avisar a Junior
         msg_barbero = f"💈 Nueva cita agendada\n\nCliente: {cliente}\nServicio: {servicio}\nFecha: {fecha}\nHora: {hora}\nPrecio: ₡{precio}"
         enviar_whatsapp(NUMERO_BARBERO, msg_barbero)
 
-        # Preparar link de WhatsApp para el cliente
         msg_cliente = f"✅ *¡Cita Confirmada!* 💈\n\nHola *{cliente}*, tu espacio para *{servicio}* el {fecha} a las {hora} está reservado.\n\nPara gestionar o cancelar:\n{DOMINIO}/?cliente_id={telefono_cliente}"
         link_wa = f"https://wa.me/{telefono_cliente}?text={urllib.parse.quote(msg_cliente)}"
         return render_template("confirmacion.html", link_wa=link_wa, cliente=cliente)
@@ -246,25 +246,63 @@ def index():
     resp.set_cookie("cliente_id", cliente_id, max_age=60*60*24*365)
     return resp
 
+@app.route("/horas")
+def horas():
+    fecha = request.args.get('fecha')
+    barbero = request.args.get('barbero')
+    
+    horas_base = ["08:00 AM", "08:30 AM", "09:00 AM", "09:30 AM", "10:00 AM", 
+                  "10:30 AM", "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM", 
+                  "01:00 PM", "01:30 PM", "02:00 PM", "02:30 PM", "03:00 PM", 
+                  "03:30 PM", "04:00 PM", "04:30 PM", "05:00 PM", "05:30 PM", 
+                  "06:00 PM", "06:30 PM", "07:00 PM"]
+
+    barbero_norm = normalizar_barbero(barbero)
+    citas = leer_citas()
+    
+    # 1. Identificamos minutos ocupados incluyendo duración
+    minutos_bloqueados = []
+    for c in citas:
+        if normalizar_barbero(c.get("barbero", "")) == barbero_norm and c.get("fecha") == fecha and c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]:
+            h_dt = _hora_ampm_a_time(c.get("hora"))
+            if h_dt:
+                min_inicio = h_dt.hour * 60 + h_dt.minute
+                dur = int(c.get("duracion", 30))
+                # Bloqueamos cada intervalo de 30 min que cubra la duración
+                for offset in range(0, dur, 30):
+                    minutos_bloqueados.append(min_inicio + offset)
+
+    # 2. Filtramos horas base
+    disponibles = []
+    for h in horas_base:
+        h_dt = _hora_ampm_a_time(h)
+        if h_dt:
+            min_actual = h_dt.hour * 60 + h_dt.minute
+            if min_actual not in minutos_bloqueados:
+                disponibles.append(h)
+    
+    # 3. Margen de seguridad de 30 min para Junior
+    MARGEN_SEGURIDAD = 30
+    if str(fecha) == _now_cr().strftime("%Y-%m-%d"):
+        tiempo_ahora = (_now_cr().hour * 60 + _now_cr().minute) + MARGEN_SEGURIDAD
+        disponibles = [
+            h for h in disponibles 
+            if (_hora_ampm_a_time(h).hour * 60 + _hora_ampm_a_time(h).minute) > tiempo_ahora
+        ]
+        
+    return jsonify(disponibles)
+
 @app.route("/cancelar", methods=["POST"])
 def cancelar():
     id_cita = request.form.get("id")
     cita = buscar_cita_por_id(id_cita)
     if not cita: return redirect(url_for("index"))
-
     cancelar_cita_por_id(id_cita)
     cliente_id = str(cita.get("cliente_id", ""))
-    
-    # Notificar
     enviar_whatsapp(NUMERO_BARBERO, f"❌ Cita CANCELADA: {cita.get('cliente')} el {cita.get('fecha')} a las {cita.get('hora')}")
-    if es_numero_whatsapp(cliente_id):
-        enviar_whatsapp(cliente_id, f"Tu cita del {cita.get('fecha')} ha sido cancelada. Ya puedes agendar de nuevo.")
-
     flash("Cita cancelada correctamente")
     if barbero_autenticado(): return redirect(url_for("barbero"))
-    resp = make_response(redirect(url_for("index", cliente_id=cliente_id)))
-    resp.set_cookie("cliente_id", cliente_id, max_age=60*60*24*365)
-    return resp
+    return redirect(url_for("index", cliente_id=cliente_id))
 
 @app.route("/atendida", methods=["POST"])
 def atendida():
@@ -275,55 +313,19 @@ def atendida():
 def barbero():
     clave = request.args.get("clave")
     if barbero_autenticado() or clave == CLAVE_BARBERO:
-        resp = make_response(_render_panel_barbero())
+        citas = leer_citas()
+        stats = {"cant_total": len(citas), "cant_activas": sum(1 for c in citas if c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]), "total_atendido": sum(_precio_a_int(c.get("precio")) for c in citas if c.get("servicio") == "CITA ATENDIDA"), "nombre": NOMBRE_BARBERO}
+        resp = make_response(render_template("barbero.html", citas=citas, stats=stats))
         resp.set_cookie("clave_barbero", CLAVE_BARBERO, max_age=60*60*24*7)
         return resp
     return "🔒 Panel protegido."
 
-def _render_panel_barbero():
-    citas = leer_citas()
-    solo, estado, q = request.args.get("solo", "hoy"), request.args.get("estado", "activas"), (request.args.get("q") or "").strip().lower()
-    # (Tus filtros de panel barbero se mantienen en el barbero.html vía JS)
-    stats = {"cant_total": len(citas), "cant_activas": sum(1 for c in citas if c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]), "total_atendido": sum(_precio_a_int(c.get("precio")) for c in citas if c.get("servicio") == "CITA ATENDIDA"), "nombre": NOMBRE_BARBERO}
-    return render_template("barbero.html", citas=citas, stats=stats)
-
-@app.route("/horas")
-def horas():
-    # 1. Capturamos los datos que envía el cliente
-    fecha = request.args.get('fecha')
-    barbero = request.args.get('barbero')
-    
-    # 2. Definimos las horas de trabajo (puedes quitar o poner más aquí)
-    horas_base = ["08:00 AM", "08:30 AM", "09:00 AM", "09:30 AM", "10:00 AM", 
-                  "10:30 AM", "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM", 
-                  "01:00 PM", "01:30 PM", "02:00 PM", "02:30 PM", "03:00 PM", 
-                  "03:30 PM", "04:00 PM", "04:30 PM", "05:00 PM", "05:30 PM", 
-                  "06:00 PM", "06:30 PM", "07:00 PM"]
-
-    # 3. Filtramos las citas que ya están tomadas
-    barbero_norm = normalizar_barbero(barbero)
-    citas = leer_citas()
-    ocupadas = [c.get("hora") for c in citas if normalizar_barbero(c.get("barbero", "")) == barbero_norm]
-    
-    # 4. Aplicamos el margen de 30 min para Junior
-    MARGEN_SEGURIDAD = 30
-    disponibles = [h for h in horas_base if h not in ocupadas]
-    
-    if str(fecha) == _now_cr().strftime("%Y-%m-%d"):
-        tiempo_limite = (_now_cr().hour * 60 + _now_cr().minute) + MARGEN_SEGURIDAD
-        disponibles = [
-            h for h in disponibles 
-            if (_hora_ampm_a_time(h).hour * 60 + _hora_ampm_a_time(h).minute) > tiempo_limite
-        ]
-        
-    return jsonify(disponibles)
 @app.route("/citas_json")
 def citas_json():
     return jsonify({"citas": leer_citas()})
 
 if __name__ == "__main__":
     app.run(debug=True)
-
 
 
 
