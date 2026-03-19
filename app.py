@@ -245,22 +245,41 @@ def index():
 
 @app.route("/horas")
 def horas():
-    fecha = request.args.get('fecha')
+    fecha_str = request.args.get('fecha')
     barbero = request.args.get('barbero')
-    
-    # LISTA EXTENDIDA HASTA LAS 8:00 PM
-    horas_base = ["08:00 AM", "08:30 AM", "09:00 AM", "09:30 AM", "10:00 AM", 
-                  "10:30 AM", "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM", 
-                  "01:00 PM", "01:30 PM", "02:00 PM", "02:30 PM", "03:00 PM", 
-                  "03:30 PM", "04:00 PM", "04:30 PM", "05:00 PM", "05:30 PM", 
-                  "06:00 PM", "06:30 PM", "07:00 PM", "07:30 PM", "08:00 PM"]
+    if not fecha_str: return jsonify([])
 
+    # 1. Determinar el día de la semana (0=Lunes, 6=Domingo)
+    fecha_dt = datetime.strptime(fecha_str, "%Y-%m-%d")
+    dia_semana = fecha_dt.weekday() 
+
+    # 2. Configurar apertura y cierre según el horario de Junior
+    if dia_semana == 6: # Domingo: 9am a 4pm
+        h_inicio, h_fin = 9, 16
+    elif dia_semana in [4, 5]: # Viernes y Sábado: 8am a 8pm
+        h_inicio, h_fin = 8, 20
+    else: # Lunes a Jueves: 9am a 8pm
+        h_inicio, h_fin = 9, 20
+
+    # 3. Generar la lista de horas base dinámicamente
+    horas_base = []
+    actual = datetime.combine(fecha_dt.date(), datetime.min.time()).replace(hour=h_inicio)
+    fin_jornada = datetime.combine(fecha_dt.date(), datetime.min.time()).replace(hour=h_fin)
+
+    while actual < fin_jornada:
+        # La última cita permitida debe terminar ANTES o IGUAL a la hora de cierre
+        # Si la cita dura 30 min, la última a las 7:30pm termina a las 8:00pm
+        if actual + timedelta(minutes=30) <= fin_jornada:
+            horas_base.append(actual.strftime("%I:%M %p"))
+        actual += timedelta(minutes=30)
+
+    # 4. Lógica de bloqueo (lo que ya tenías)
     barbero_norm = normalizar_barbero(barbero)
     citas = leer_citas()
     
     minutos_bloqueados = []
     for c in citas:
-        if normalizar_barbero(c.get("barbero", "")) == barbero_norm and c.get("fecha") == fecha and c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]:
+        if normalizar_barbero(c.get("barbero", "")) == barbero_norm and c.get("fecha") == fecha_str and c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]:
             h_dt = _hora_ampm_a_time(c.get("hora"))
             if h_dt:
                 min_inicio = h_dt.hour * 60 + h_dt.minute
@@ -276,9 +295,9 @@ def horas():
             if min_actual not in minutos_bloqueados:
                 disponibles.append(h)
     
-    # MARGEN DE 30 MINUTOS
+    # 5. Margen de seguridad para citas el mismo día
     MARGEN_SEGURIDAD = 30
-    if str(fecha) == _now_cr().strftime("%Y-%m-%d"):
+    if str(fecha_str) == _now_cr().strftime("%Y-%m-%d"):
         tiempo_ahora = (_now_cr().hour * 60 + _now_cr().minute) + MARGEN_SEGURIDAD
         disponibles = [
             h for h in disponibles 
