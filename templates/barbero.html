@@ -99,6 +99,23 @@
   </div>
 
 <script>
+// FUNCIÓN PARA CONVERTIR HORA 24H -> 12H (Pone el "pm" que Junior quiere)
+function formatearHora12h(horaStr) {
+    if (!horaStr) return "";
+    let s = String(horaStr).toLowerCase().trim();
+    if (s.includes("am") || s.includes("pm")) return s;
+    
+    let parts = s.split(':');
+    if (parts.length < 2) return s;
+
+    let horas = parseInt(parts[0]);
+    let minutos = parts[1];
+    const ampm = horas >= 12 ? 'pm' : 'am';
+    horas = horas % 12;
+    horas = horas ? horas : 12; 
+    return `${horas}:${minutos} ${ampm}`;
+}
+
 function precioAInt(p){
   return parseInt(String(p||"0").replace("₡","").replaceAll(",","").trim()) || 0;
 }
@@ -129,6 +146,7 @@ function aplicarFiltros(citas){
   if(q){
     base = base.filter(c => String(c.cliente||"").toLowerCase().includes(q) || String(c.servicio||"").toLowerCase().includes(q));
   }
+  // ORDENAMIENTO CRONOLÓGICO (VITAL)
   base.sort((a,b) => String(a.fecha).localeCompare(String(b.fecha)) || String(a.hora).localeCompare(String(b.hora)));
   return { base, solo, hoy, manana };
 }
@@ -158,10 +176,13 @@ function renderCitas(citas){
     const estadoTxt = c.servicio === "CITA CANCELADA" ? "Cancelada" : (c.servicio === "CITA ATENDIDA" ? "Atendida" : "Activa");
     const tagClass = c.servicio === "CITA CANCELADA" ? "bad" : (c.servicio === "CITA ATENDIDA" ? "done" : "ok");
 
+    // AQUÍ FORMATEAMOS LA HORA PARA QUE JUNIOR LA VEA BONITA
+    const horaBonita = formatearHora12h(c.hora);
+
     // RENDER TABLA (PC)
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${c.fecha}</td><td>${c.hora}</td><td>${c.cliente || ""}</td>
+      <td>${c.fecha}</td><td>${horaBonita}</td><td>${c.cliente || ""}</td>
       <td>${c.servicio || ""}</td><td>₡${c.precio || 0}</td>
       <td><span class="tag ${tagClass}">${estadoTxt}</span></td>
       <td>
@@ -183,7 +204,7 @@ function renderCitas(citas){
         <div>
           <div class="cli-name">${c.cliente || ""}</div>
           <div class="cli-serv">${c.servicio || ""}</div>
-          <div class="cli-meta"><span>📅 ${c.fecha}</span> <span>🕒 ${c.hora}</span> <span>💰 ₡${c.precio || 0}</span></div>
+          <div class="cli-meta"><span>📅 ${c.fecha}</span> <span>🕒 ${horaBonita}</span> <span>💰 ₡${c.precio || 0}</span></div>
         </div>
         <span class="tag ${tagClass}">${estadoTxt}</span>
       </div>
