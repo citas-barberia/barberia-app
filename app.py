@@ -239,25 +239,36 @@ def index():
         fecha = request.form.get("fecha", "").strip()
         hora_original = request.form.get("hora", "").strip()
 
-        # CAMBIO: Convertimos la hora a 24h para la Base de Datos (para que ordene bien)
-        dt_hora = _hora_ampm_a_time(hora_original)
-        hora_db = dt_hora.strftime("%H:%M") if dt_hora else hora_original
+        # 1. Convertimos la hora que viene del formulario a objeto time para comparar
+        dt_hora_solicitada = _hora_ampm_a_time(hora_original)
+        
+        # 2. Lógica de conflicto mejorada (compara objetos de tiempo, no texto)
+        def hay_choque(cita_existente, hora_nueva_dt):
+            h_existente_dt = _hora_ampm_a_time(cita_existente.get("hora"))
+            if not h_existente_dt or not hora_nueva_dt:
+                return False
+            # Verifica si es el mismo barbero, misma fecha y misma hora
+            mismo_barbero = normalizar_barbero(cita_existente.get("barbero", "")) == normalizar_barbero(barbero_raw)
+            misma_fecha = str(cita_existente.get("fecha")) == fecha
+            misma_hora = h_existente_dt == hora_nueva_dt
+            activa = cita_existente.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]
+            return mismo_barbero and misma_fecha and misma_hora and activa
 
-        duracion = 60 if servicio == "Corte y Barba" else 30
-        cliente_id = telefono_cliente 
-        barbero = normalizar_barbero(barbero_raw)
-        precio = str(servicios.get(servicio, 0))
-
-        conflict = any(normalizar_barbero(c.get("barbero", "")) == barbero and str(c.get("fecha")) == fecha and str(c.get("hora")) == hora_original and c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"] for c in citas_todas)
+        conflict = any(hay_choque(c, dt_hora_solicitada) for c in citas_todas)
 
         if conflict:
             flash("La hora seleccionada ya está ocupada.")
             return redirect(url_for("index", cliente_id=cliente_id))
 
+        # 3. Si no hay choque, guardamos en formato 24h para el orden de Supabase
+        hora_db = dt_hora_solicitada.strftime("%H:%M") if dt_hora_solicitada else hora_original
+        duracion = 60 if servicio == "Corte y Barba" else 30
+        precio = str(servicios.get(servicio, 0))
         id_cita = str(uuid.uuid4())
-        # Guardamos con hora_db (formato 24h)
-        guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora_db, duracion)
 
+        guardar_cita(id_cita, cliente, telefono_cliente, normalizar_barbero(barbero_raw), servicio, precio, fecha, hora_db, duracion)
+
+        # Mensajes de WhatsApp
         msg_barbero = f"💈 Nueva cita agendada\n\nCliente: {cliente}\nServicio: {servicio}\nFecha: {fecha}\nHora: {hora_original}\nPrecio: ₡{precio}"
         enviar_whatsapp(NUMERO_BARBERO, msg_barbero)
 
