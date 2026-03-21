@@ -65,17 +65,26 @@ def _precio_a_int(valor):
 
 def _hora_ampm_a_time(hora_str: str):
     if not hora_str: return None
+    # Limpiamos el texto: quitamos espacios y lo pasamos a minúsculas
     s = str(hora_str).strip().lower().replace(" ", "")
-    try: 
-        # Soporta formatos con y sin espacio: "01:30pm" o "01:30 pm"
-        if ":" not in s: return None
-        return datetime.strptime(s, "%I:%M%p").time()
-    except: 
-        try:
-            return datetime.strptime(s, "%H:%M").time()
-        except:
-            return None
+    
+    # Intentamos formato 12h (08:00am, 1:30pm)
+    try:
+        if "am" in s or "pm" in s:
+            return datetime.strptime(s, "%I:%M%p").time()
+    except: pass
 
+    # Intentamos formato 24h (08:00, 13:30)
+    try:
+        return datetime.strptime(s, "%H:%M").time()
+    except: pass
+
+    # Si llega con segundos (algunas DB lo mandan así: 13:30:00)
+    try:
+        return datetime.strptime(s, "%H:%M:%S").time()
+    except: pass
+
+    return None
 def _now_cr():
     return datetime.now(TZ)
 
