@@ -30,6 +30,7 @@
     input, select { flex: 1; min-width: 120px; padding: 12px; border-radius: 12px; background: #121213; color: #fff; border: 1px solid #2f2f30; font-size: 14px; }
     button { padding: 12px 20px; border-radius: 12px; border: none; cursor: pointer; background: #D4AF37; color: #111; font-weight: 700; transition: 0.3s; }
     button:active { transform: scale(0.98); }
+    button:disabled { background: #444 !important; color: #888 !important; cursor: not-allowed; transform: none; }
     .small { opacity: .6; font-size: 12px; text-align: center; margin-bottom: 15px; }
     .citas-mobile-container { display: flex; flex-direction: column; gap: 12px; }
     .cita-item { background: #242425; border: 1px solid #2e2e2f; border-radius: 16px; padding: 16px; }
@@ -57,6 +58,16 @@
       <h1>Panel de {{ stats.get('nombre', 'Junior') }} 💈</h1>
       <a class="btn-hist" href="/barbero/historial">📊 Ver Historial 2026</a>
     </div>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for message in messages %}
+          <div style="background: #28a745; color: white; padding: 10px; border-radius: 10px; margin-bottom: 15px; text-align: center; font-weight: bold;">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
 
     <div class="stats">
       <div class="card"><div class="t" id="t_citas">Citas</div><div class="v" id="v_total">{{ stats.cant_total }}</div></div>
@@ -99,15 +110,20 @@
   </div>
 
 <script>
-// FUNCIÓN PARA CONVERTIR HORA 24H -> 12H (Pone el "pm" que Junior quiere)
+// BLOQUEO DE BOTONES PARA EVITAR QUE SE PEGUE
+function desactivarBoton(form) {
+    const btn = form.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.innerHTML = "Procesando...";
+    return true; // Permite que el form se envíe
+}
+
 function formatearHora12h(horaStr) {
     if (!horaStr) return "";
     let s = String(horaStr).toLowerCase().trim();
     if (s.includes("am") || s.includes("pm")) return s;
-    
     let parts = s.split(':');
     if (parts.length < 2) return s;
-
     let horas = parseInt(parts[0]);
     let minutos = parts[1];
     const ampm = horas >= 12 ? 'pm' : 'am';
@@ -119,10 +135,12 @@ function formatearHora12h(horaStr) {
 function precioAInt(p){
   return parseInt(String(p||"0").replace("₡","").replaceAll(",","").trim()) || 0;
 }
+
 function isoHoy(){
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
+
 function isoManana(){
   const d = new Date(); d.setDate(d.getDate()+1);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -146,7 +164,6 @@ function aplicarFiltros(citas){
   if(q){
     base = base.filter(c => String(c.cliente||"").toLowerCase().includes(q) || String(c.servicio||"").toLowerCase().includes(q));
   }
-  // ORDENAMIENTO CRONOLÓGICO (VITAL)
   base.sort((a,b) => String(a.fecha).localeCompare(String(b.fecha)) || String(a.hora).localeCompare(String(b.hora)));
   return { base, solo, hoy, manana };
 }
@@ -175,8 +192,6 @@ function renderCitas(citas){
     const esActiva = !["CITA CANCELADA","CITA ATENDIDA"].includes(c.servicio);
     const estadoTxt = c.servicio === "CITA CANCELADA" ? "Cancelada" : (c.servicio === "CITA ATENDIDA" ? "Atendida" : "Activa");
     const tagClass = c.servicio === "CITA CANCELADA" ? "bad" : (c.servicio === "CITA ATENDIDA" ? "done" : "ok");
-
-    // AQUÍ FORMATEAMOS LA HORA PARA QUE JUNIOR LA VEA BONITA
     const horaBonita = formatearHora12h(c.hora);
 
     // RENDER TABLA (PC)
@@ -188,8 +203,14 @@ function renderCitas(citas){
       <td>
         ${esActiva ? `
           <div style="display:flex; gap:5px;">
-            <form method="POST" action="/atendida" style="margin:0;"><input type="hidden" name="id" value="${c.id}"><button type="submit" style="padding:8px; font-size:11px;">LISTO</button></form>
-            <form method="POST" action="/cancelar" style="margin:0;" onsubmit="return confirm('¿Cancelar cita?')"><input type="hidden" name="id" value="${c.id}"><button type="submit" style="background:#dc3545; color:white; padding:8px; font-size:11px;">X</button></form>
+            <form method="POST" action="/atendida" onsubmit="return desactivarBoton(this)">
+                <input type="hidden" name="id" value="${c.id}">
+                <button type="submit" style="padding:8px; font-size:11px;">LISTO</button>
+            </form>
+            <form method="POST" action="/cancelar" onsubmit="if(confirm('¿Cancelar cita?')) { return desactivarBoton(this); } else { return false; }">
+                <input type="hidden" name="id" value="${c.id}">
+                <button type="submit" style="background:#dc3545; color:white; padding:8px; font-size:11px;">X</button>
+            </form>
           </div>
         ` : ''}
       </td>
@@ -209,8 +230,14 @@ function renderCitas(citas){
         <span class="tag ${tagClass}">${estadoTxt}</span>
       </div>
       ${esActiva ? `
-        <form method="POST" action="/atendida"><input type="hidden" name="id" value="${c.id}"><button type="submit" class="btn-atender-mobile">Marcar Atendida</button></form>
-        <form method="POST" action="/cancelar" onsubmit="return confirm('¿Cancelar cita?')"><input type="hidden" name="id" value="${c.id}"><button type="submit" class="btn-cancelar-mobile">Cancelar Cita</button></form>
+        <form method="POST" action="/atendida" onsubmit="return desactivarBoton(this)">
+            <input type="hidden" name="id" value="${c.id}">
+            <button type="submit" class="btn-atender-mobile">Marcar Atendida</button>
+        </form>
+        <form method="POST" action="/cancelar" onsubmit="if(confirm('¿Cancelar cita?')) { return desactivarBoton(this); } else { return false; }">
+            <input type="hidden" name="id" value="${c.id}">
+            <button type="submit" class="btn-cancelar-mobile">Cancelar Cita</button>
+        </form>
       ` : ''}
     `;
     cardsContainer.appendChild(card);
@@ -230,13 +257,6 @@ async function cargarCitas(guardarParams=false){
     renderCitas(base);
     document.getElementById("t_citas").textContent = solo === "hoy" ? "Citas (Hoy)" : solo === "manana" ? "Citas (Mañana)" : "Citas (Todas)";
     document.getElementById("last_update").textContent = "Última actualización: " + new Date().toLocaleTimeString();
-    if(guardarParams){
-      const params = new URLSearchParams(window.location.search);
-      params.set("solo", document.getElementById("solo").value);
-      params.set("estado", document.getElementById("estado").value);
-      params.set("q", document.getElementById("q").value || "");
-      history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
-    }
   }catch(e){ document.getElementById("last_update").textContent = "Error al actualizar."; }
 }
 
@@ -246,7 +266,8 @@ async function cargarCitas(guardarParams=false){
   if(params.get("estado")) document.getElementById("estado").value = params.get("estado");
   if(params.get("q")) document.getElementById("q").value = params.get("q");
 })();
-setInterval(() => cargarCitas(false), 5000);
+// Bajamos la frecuencia a 10 segundos para no saturar Render
+setInterval(() => cargarCitas(false), 10000);
 cargarCitas(false);
 </script>
 </body>

@@ -368,17 +368,36 @@ def horas():
 def cancelar():
     id_cita = request.form.get("id")
     cita = buscar_cita_por_id(id_cita)
-    if not cita: return redirect(url_for("index"))
+    
+    if not cita: 
+        return redirect(url_for("index"))
+
+    # Paso 1: Cancelar la cita de una vez (esto es rápido)
     cancelar_cita_por_id(id_cita)
-    cliente_id = str(cita.get("cliente_id", ""))
-    enviar_whatsapp(NUMERO_BARBERO, f"❌ Cita CANCELADA: {cita.get('cliente')} el {cita.get('fecha')} a las {cita.get('hora')}")
+    
+    # Paso 2: El envío de WhatsApp suele ser lento. 
+    # Lo metemos en un try para que si falla el servicio, no bloquee la pantalla de Junior.
+    try:
+        enviar_whatsapp(NUMERO_BARBERO, f"❌ Cita CANCELADA: {cita.get('cliente')} el {cita.get('fecha')} a las {cita.get('hora')}")
+    except Exception as e:
+        print(f"Error enviando WhatsApp: {e}") # Solo lo logueamos, no detenemos el proceso.
+
     flash("Cita cancelada correctamente")
-    if barbero_autenticado(): return redirect(url_for("barbero"))
+    
+    # Paso 3: Redirigir de inmediato para que la página cargue de nuevo.
+    if barbero_autenticado(): 
+        return redirect(url_for("barbero"))
+    
+    cliente_id = str(cita.get("cliente_id", ""))
     return redirect(url_for("index", cliente_id=cliente_id))
 
 @app.route("/atendida", methods=["POST"])
 def atendida():
-    if barbero_autenticado(): marcar_atendida_por_id(request.form.get("id"))
+    id_cita = request.form.get("id")
+    if barbero_autenticado() and id_cita:
+        marcar_atendida_por_id(id_cita)
+        flash("¡Cita completada!") # Agregamos un flash para que Junior vea que sí funcionó
+    
     return redirect(url_for("barbero"))
 
 @app.route("/barbero", methods=["GET"])
