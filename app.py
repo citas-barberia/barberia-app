@@ -67,9 +67,14 @@ def _hora_ampm_a_time(hora_str: str):
     if not hora_str: return None
     s = str(hora_str).strip().lower().replace(" ", "")
     try: 
+        # Soporta formatos con y sin espacio: "01:30pm" o "01:30 pm"
         if ":" not in s: return None
         return datetime.strptime(s, "%I:%M%p").time()
-    except: return None
+    except: 
+        try:
+            return datetime.strptime(s, "%H:%M").time()
+        except:
+            return None
 
 def _now_cr():
     return datetime.now(TZ)
@@ -131,15 +136,32 @@ def guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fe
 
 def leer_citas_db():
     url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/citas"
-    data = _supabase_request("GET", url, params={"select": "*"})
+    # CAMBIO: Agregamos orden por fecha y hora ascendente
+    params = {
+        "select": "*",
+        "order": "fecha.asc,hora.asc"
+    }
+    data = _supabase_request("GET", url, params=params)
     if data is None: return None
-    return [{
-        "id": r.get("id"), "cliente": r.get("cliente", ""), 
-        "cliente_id": r.get("cliente_id", ""), "barbero": r.get("barbero", ""), 
-        "servicio": r.get("servicio", ""), "precio": str(r.get("precio", "")), 
-        "fecha": str(r.get("fecha", "")), "hora": str(r.get("hora", "")),
-        "duracion": str(r.get("duracion", "30"))
-    } for r in data]
+    
+    citas_procesadas = []
+    for r in data:
+        hora_original = str(r.get("hora", ""))
+        # Convertimos la hora de 24h a 12h para que Junior la vea bonita
+        try:
+            hora_obj = datetime.strptime(hora_original, "%H:%M")
+            hora_bonita = hora_obj.strftime("%I:%M %p").lower()
+        except:
+            hora_bonita = hora_original
+
+        citas_procesadas.append({
+            "id": r.get("id"), "cliente": r.get("cliente", ""), 
+            "cliente_id": r.get("cliente_id", ""), "barbero": r.get("barbero", ""), 
+            "servicio": r.get("servicio", ""), "precio": str(r.get("precio", "")), 
+            "fecha": str(r.get("fecha", "")), "hora": hora_bonita,
+            "duracion": str(r.get("duracion", "30"))
+        })
+    return citas_procesadas
 
 def guardar_cita_db(cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion):
     url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/citas"
@@ -152,6 +174,7 @@ def guardar_cita_db(cliente, cliente_id, barbero, servicio, precio, fecha, hora,
     return res is not None
 
 def leer_citas():
+    # Siempre intentamos leer de DB primero para tener el orden correcto
     if USAR_SUPABASE:
         data = leer_citas_db()
         if data is not None: return data
@@ -214,28 +237,31 @@ def index():
         barbero_raw = request.form.get("barbero", "").strip()
         servicio = request.form.get("servicio", "").strip()
         fecha = request.form.get("fecha", "").strip()
-        hora = request.form.get("hora", "").strip()
+        hora_original = request.form.get("hora", "").strip()
 
-        # DURACIÓN DINÁMICA
+        # CAMBIO: Convertimos la hora a 24h para la Base de Datos (para que ordene bien)
+        dt_hora = _hora_ampm_a_time(hora_original)
+        hora_db = dt_hora.strftime("%H:%M") if dt_hora else hora_original
+
         duracion = 60 if servicio == "Corte y Barba" else 30
-
         cliente_id = telefono_cliente 
         barbero = normalizar_barbero(barbero_raw)
         precio = str(servicios.get(servicio, 0))
 
-        conflict = any(normalizar_barbero(c.get("barbero", "")) == barbero and str(c.get("fecha")) == fecha and str(c.get("hora")) == hora and c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"] for c in citas_todas)
+        conflict = any(normalizar_barbero(c.get("barbero", "")) == barbero and str(c.get("fecha")) == fecha and str(c.get("hora")) == hora_original and c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"] for c in citas_todas)
 
         if conflict:
             flash("La hora seleccionada ya está ocupada.")
             return redirect(url_for("index", cliente_id=cliente_id))
 
         id_cita = str(uuid.uuid4())
-        guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion)
+        # Guardamos con hora_db (formato 24h)
+        guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora_db, duracion)
 
-        msg_barbero = f"💈 Nueva cita agendada\n\nCliente: {cliente}\nServicio: {servicio}\nFecha: {fecha}\nHora: {hora}\nPrecio: ₡{precio}"
+        msg_barbero = f"💈 Nueva cita agendada\n\nCliente: {cliente}\nServicio: {servicio}\nFecha: {fecha}\nHora: {hora_original}\nPrecio: ₡{precio}"
         enviar_whatsapp(NUMERO_BARBERO, msg_barbero)
 
-        msg_cliente = f"✅ *¡Cita Confirmada!* 💈\n\nHola *{cliente}*, tu espacio para *{servicio}* el {fecha} a las {hora} está reservado.\n\nPara gestionar o cancelar:\n{DOMINIO}/?cliente_id={telefono_cliente}"
+        msg_cliente = f"✅ *¡Cita Confirmada!* 💈\n\nHola *{cliente}*, tu espacio para *{servicio}* el {fecha} a las {hora_original} está reservado.\n\nPara gestionar o cancelar:\n{DOMINIO}/?cliente_id={telefono_cliente}"
         link_wa = f"https://wa.me/{telefono_cliente}?text={urllib.parse.quote(msg_cliente)}"
         return render_template("confirmacion.html", link_wa=link_wa, cliente=cliente)
 
@@ -249,31 +275,22 @@ def horas():
     barbero = request.args.get('barbero')
     if not fecha_str: return jsonify([])
 
-    # 1. Determinar el día de la semana (0=Lunes, 6=Domingo)
     fecha_dt = datetime.strptime(fecha_str, "%Y-%m-%d")
     dia_semana = fecha_dt.weekday() 
 
-    # 2. Configurar apertura y cierre según el horario de Junior
-    if dia_semana == 6: # Domingo: 9am a 4pm
-        h_inicio, h_fin = 9, 16
-    elif dia_semana in [4, 5]: # Viernes y Sábado: 8am a 8pm
-        h_inicio, h_fin = 8, 20
-    else: # Lunes a Jueves: 9am a 8pm
-        h_inicio, h_fin = 9, 20
+    if dia_semana == 6: h_inicio, h_fin = 9, 16
+    elif dia_semana in [4, 5]: h_inicio, h_fin = 8, 20
+    else: h_inicio, h_fin = 9, 20
 
-    # 3. Generar la lista de horas base dinámicamente
     horas_base = []
     actual = datetime.combine(fecha_dt.date(), datetime.min.time()).replace(hour=h_inicio)
     fin_jornada = datetime.combine(fecha_dt.date(), datetime.min.time()).replace(hour=h_fin)
 
     while actual < fin_jornada:
-        # La última cita permitida debe terminar ANTES o IGUAL a la hora de cierre
-        # Si la cita dura 30 min, la última a las 7:30pm termina a las 8:00pm
         if actual + timedelta(minutes=30) <= fin_jornada:
             horas_base.append(actual.strftime("%I:%M %p"))
         actual += timedelta(minutes=30)
 
-    # 4. Lógica de bloqueo (lo que ya tenías)
     barbero_norm = normalizar_barbero(barbero)
     citas = leer_citas()
     
@@ -295,7 +312,6 @@ def horas():
             if min_actual not in minutos_bloqueados:
                 disponibles.append(h)
     
-    # 5. Margen de seguridad para citas el mismo día
     MARGEN_SEGURIDAD = 30
     if str(fecha_str) == _now_cr().strftime("%Y-%m-%d"):
         tiempo_ahora = (_now_cr().hour * 60 + _now_cr().minute) + MARGEN_SEGURIDAD
@@ -340,6 +356,5 @@ def citas_json():
 
 if __name__ == "__main__":
     app.run(debug=True)
-
 
 
