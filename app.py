@@ -286,13 +286,23 @@ def horas():
     barbero = request.args.get('barbero')
     if not fecha_str: return jsonify([])
 
-    fecha_dt = datetime.strptime(fecha_str, "%Y-%m-%d")
+    # 1. Determinar el día de la semana (0=Lunes, 6=Domingo)
+    try:
+        fecha_dt = datetime.strptime(fecha_str, "%Y-%m-%d")
+    except:
+        return jsonify([])
+        
     dia_semana = fecha_dt.weekday() 
 
-    if dia_semana == 6: h_inicio, h_fin = 9, 16
-    elif dia_semana in [4, 5]: h_inicio, h_fin = 8, 20
-    else: h_inicio, h_fin = 9, 20
+    # 2. Configurar apertura y cierre según el horario de Junior
+    if dia_semana == 6: # Domingo: 9am a 4pm
+        h_inicio, h_fin = 9, 16
+    elif dia_semana in [4, 5]: # Viernes y Sábado: 8am a 8pm
+        h_inicio, h_fin = 8, 20
+    else: # Lunes a Jueves: 9am a 8pm
+        h_inicio, h_fin = 9, 20
 
+    # 3. Generar la lista de horas base (lo que ve el cliente)
     horas_base = []
     actual = datetime.combine(fecha_dt.date(), datetime.min.time()).replace(hour=h_inicio)
     fin_jornada = datetime.combine(fecha_dt.date(), datetime.min.time()).replace(hour=h_fin)
@@ -302,27 +312,37 @@ def horas():
             horas_base.append(actual.strftime("%I:%M %p"))
         actual += timedelta(minutes=30)
 
+    # 4. Lógica de BLOQUEO CRÍTICA (Comparación por minutos)
     barbero_norm = normalizar_barbero(barbero)
     citas = leer_citas()
     
     minutos_bloqueados = []
     for c in citas:
-        if normalizar_barbero(c.get("barbero", "")) == barbero_norm and c.get("fecha") == fecha_str and c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]:
-            h_dt = _hora_ampm_a_time(c.get("hora"))
-            if h_dt:
-                min_inicio = h_dt.hour * 60 + h_dt.minute
+        # Filtramos por barbero, fecha y que la cita sea válida (no cancelada)
+        if normalizar_barbero(c.get("barbero", "")) == barbero_norm and \
+           str(c.get("fecha")) == fecha_str and \
+           c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]:
+            
+            # Convertimos la hora de la DB (sea "08:00" o "08:00 am") a objeto time
+            h_db_dt = _hora_ampm_a_time(c.get("hora"))
+            if h_db_dt:
+                min_inicio = h_db_dt.hour * 60 + h_db_dt.minute
                 dur = int(c.get("duracion", 30))
+                # Bloqueamos el rango que dura la cita (ej: 30 o 60 min)
                 for offset in range(0, dur, 30):
                     minutos_bloqueados.append(min_inicio + offset)
 
+    # 5. Filtrar las horas que NO están bloqueadas
     disponibles = []
     for h in horas_base:
-        h_dt = _hora_ampm_a_time(h)
-        if h_dt:
-            min_actual = h_dt.hour * 60 + h_dt.minute
+        h_lista_dt = _hora_ampm_a_time(h)
+        if h_lista_dt:
+            min_actual = h_lista_dt.hour * 60 + h_lista_dt.minute
+            # Si los minutos de esta hora no están en la lista de bloqueados, se muestra
             if min_actual not in minutos_bloqueados:
                 disponibles.append(h)
     
+    # 6. Margen de seguridad para citas el mismo día
     MARGEN_SEGURIDAD = 30
     if str(fecha_str) == _now_cr().strftime("%Y-%m-%d"):
         tiempo_ahora = (_now_cr().hour * 60 + _now_cr().minute) + MARGEN_SEGURIDAD
