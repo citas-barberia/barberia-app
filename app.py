@@ -313,22 +313,19 @@ def index():
 @app.route("/horas")
 def horas():
     try:
-        fecha_str = request.args.get('fecha') # Viene "2026-03-22"
-        barbero_env = os.getenv("NOMBRE_BARBERO", "Junior")
-        
-        if not fecha_str:
-            return jsonify([])
+        fecha_str = request.args.get('fecha') # Viene "2026-03-21"
+        if not fecha_str: return jsonify([])
 
-        # 1. Configurar horario según el día
         f_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
+        ahora_cr = datetime.now(TZ)
+        hoy_iso = ahora_cr.strftime("%Y-%m-%d")
+
+        # 1. GENERAR HORAS SEGÚN DÍA
         dia_semana = f_obj.weekday()
-        
-        # Horarios: Dom(6), Vie(4), Sab(5)
         if dia_semana == 6: h_inicio, h_fin = 9, 16
         elif dia_semana in [4, 5]: h_inicio, h_fin = 8, 20
         else: h_inicio, h_fin = 9, 20
 
-        # 2. Generar horas base
         horas_base = []
         actual = datetime.combine(f_obj.date(), datetime.min.time()).replace(hour=h_inicio)
         fin_jornada = datetime.combine(f_obj.date(), datetime.min.time()).replace(hour=h_fin)
@@ -337,32 +334,43 @@ def horas():
             horas_base.append(actual.strftime("%I:%M %p").lower())
             actual += timedelta(minutes=30)
 
-        # 3. Bloqueo de citas (Comparación segura)
-        citas = leer_citas() # Usamos la función que ya tenés
+        # 2. FILTRAR POR PASADO (Arregla punto 1)
+        # Si la fecha es HOY, quitamos las horas que ya pasaron
+        if fecha_str == hoy_iso:
+            # Damos 30 min de margen para que no agenden "para ya"
+            limite = ahora_cr + timedelta(minutes=30)
+            horas_base = [h for h in horas_base if _hora_ampm_a_time(h) > limite.time()]
+        elif fecha_str < hoy_iso:
+            # Si es un día pasado, no hay nada disponible
+            return jsonify([])
+
+        # 3. BLOQUEAR CITAS EXISTENTES (Arregla punto 2)
+        citas = leer_citas() 
         bloqueadas = []
-        fecha_comparar = f_obj.strftime("%d/%m/%Y") # "22/03/2026"
+        # El pedacito de fecha que sale en la DB (ej: "22/03/2026")
+        fecha_comparar = f_obj.strftime("%d/%m/%Y") 
 
         for c in citas:
-            # Si el pedazo de fecha está en el texto y no está cancelada
+            # Solo si la fecha está en el texto y no está cancelada/atendida
             if fecha_comparar in str(c.get("fecha", "")) and c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]:
                 h_cita = str(c.get("hora", "")).lower().strip()
                 bloqueadas.append(h_cita)
                 
-                # Bloquear segundo bloque si es servicio largo
-                if int(c.get("duracion", 30)) > 30:
+                # Bloquear bloque extra para servicios largos (1 hora)
+                if "Corte y Barba" in str(c.get("servicio", "")):
                     try:
                         h_dt = datetime.strptime(h_cita, "%I:%M %p")
                         proxima = (h_dt + timedelta(minutes=30)).strftime("%I:%M %p").lower()
                         bloqueadas.append(proxima)
                     except: pass
 
-        # 4. Resultado final
-        disponibles = [h.upper() for h in horas_base if h not in bloqueadas]
+        # 4. RESULTADO FINAL
+        disponibles = [h.upper() for h in horas_base if h.lower().strip() not in bloqueadas]
         return jsonify(disponibles)
 
     except Exception as e:
         print(f"❌ Error en /horas: {e}")
-        return jsonify(["Error servidor"])
+        return jsonify([])
 
 @app.route("/cancelar", methods=["POST"])
 def cancelar():
