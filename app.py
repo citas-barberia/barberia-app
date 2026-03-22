@@ -15,7 +15,7 @@ app.secret_key = "secret_key"
 # CONFIG WHATSAPP (Meta)
 # =========================
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "barberia123")
-NUMERO_BARBERO = os.getenv("NUMERO_BARBERO", "50672314147")
+NUMERO_BARBERO = os.getenv("NUMERO_BARBERO", "50672500044")
 DOMINIO = os.getenv("DOMINIO", "https://barberia-app-1.onrender.com")
 NOMBRE_BARBERO = os.getenv("NOMBRE_BARBERO", "Junior")
 CLAVE_BARBERO = os.getenv("CLAVE_BARBERO", "1234")
