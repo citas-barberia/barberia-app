@@ -133,7 +133,10 @@ function formatearHora12h(horaStr) {
 }
 
 function precioAInt(p){
-  return parseInt(String(p||"0").replace("₡","").replaceAll(",","").trim()) || 0;
+  if (!p) return 0;
+  // Esta línea borra cualquier letra o símbolo y deja solo los números para poder sumarlos
+  let limpio = String(p).replace(/[^0-9]/g, ''); 
+  return parseInt(limpio) || 0;
 }
 
 function isoHoy(){
@@ -184,13 +187,18 @@ function actualizarStats(citasDia){
   const cant_canceladas = citasDia.filter(c => c.servicio === "CITA CANCELADA").length;
   const cant_atendidas = citasDia.filter(c => c.servicio === "CITA ATENDIDA").length;
   const cant_activas = citasDia.filter(c => !["CITA CANCELADA","CITA ATENDIDA"].includes(c.servicio)).length;
-  const total_atendido = citasDia.filter(c => c.servicio === "CITA ATENDIDA").reduce((acc,c) => acc + precioAInt(c.precio), 0);
+  
+  // Suma correctamente usando la nueva función limpiadora
+  const total_atendido = citasDia
+    .filter(c => c.servicio === "CITA ATENDIDA")
+    .reduce((acc, c) => acc + precioAInt(c.precio), 0);
 
   document.getElementById("v_total").textContent = cant_total;
   document.getElementById("v_activas").textContent = cant_activas;
   document.getElementById("v_atendidas").textContent = cant_atendidas;
   document.getElementById("v_canceladas").textContent = cant_canceladas;
-  document.getElementById("v_total_cobrado").textContent = "₡" + total_atendido;
+  // Le ponemos formato bonito con puntos (₡79.000)
+  document.getElementById("v_total_cobrado").textContent = "₡" + total_atendido.toLocaleString('es-CR');
 }
 
 function renderCitas(citas){
