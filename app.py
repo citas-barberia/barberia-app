@@ -356,54 +356,67 @@ def horas():
         if not fecha_str: return jsonify([])
 
         f_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
-        # Formatos posibles en la DB
-        f_comp1 = f_obj.strftime("%d/%m/%Y") # "22/03/2026"
-        f_comp2 = fecha_str                  # "2026-03-22"
+        dia_semana = f_obj.weekday() # 0=Lunes, 6=Domingo
+        
+        # --- HORARIO ESTRICTO DE JUNIOR ---
+        if dia_semana == 6: # DOMINGO
+            h_inicio, h_fin = 9, 16
+        elif dia_semana in [4, 5]: # VIERNES Y SÁBADO
+            h_inicio, h_fin = 8, 20
+        else: # LUNES A JUEVES
+            h_inicio, h_fin = 9, 20
 
-        # 1. Generar horas del día (9am a 8pm por defecto para Junior)
+        # 1. Generar horas base del día
         horas_base = []
-        temp = datetime.combine(f_obj, datetime.min.time()).replace(hour=8)
-        while temp.hour < 20:
-            # Formato ultra-limpio: "9:00am"
+        temp = datetime.combine(f_obj, datetime.min.time()).replace(hour=h_inicio)
+        fin_jornada = datetime.combine(f_obj, datetime.min.time()).replace(hour=h_fin)
+        
+        while temp < fin_jornada:
+            # Formato: "9:00am"
             horas_base.append(temp.strftime("%I:%M%p").lower().lstrip('0'))
             temp += timedelta(minutes=30)
 
-        # 2. BLOQUEO TOTAL
+        # 2. BLOQUEO DE CITAS (Fuerza Bruta)
         citas = leer_citas_fuerza_bruta()
         bloqueadas = []
-        
+        f_comp1 = f_obj.strftime("%d/%m/%Y") # "22/03/2026"
+        f_comp2 = fecha_str                  # "2026-03-22"
+
         for c in citas:
             f_db = str(c.get("fecha", ""))
             srv = str(c.get("servicio", ""))
             
-            # Si la fecha coincide y NO está cancelada
+            # Si es el mismo día y la cita no está cancelada/atendida
             if (f_comp1 in f_db or f_comp2 in f_db) and "CANCELADA" not in srv.upper() and "ATENDIDA" not in srv.upper():
-                # Limpiamos la hora de la DB a muerte: "09:00 AM" -> "9:00am"
+                # Normalizamos hora de DB: "09:00 AM" -> "9:00am"
                 h_db = str(c.get("hora", "")).lower().replace(" ", "").lstrip('0')
-                if ":" in h_db:
-                    h_db = h_db[:5] if "m" not in h_db else h_db # Limpia "09:00:00"
+                if ":" in h_db: h_db = h_db[:5] if "m" not in h_db else h_db
                 
-                # Buscamos coincidencias
-                for h_b in horas_base:
-                    if h_db in h_b or h_b in h_db:
-                        bloqueadas.append(h_b)
-                        # Si es servicio largo, bloqueamos la siguiente
-                        if "BARBA" in srv.upper() or int(c.get("duracion", 30)) > 30:
-                            idx = horas_base.index(h_b)
-                            if idx + 1 < len(horas_base):
-                                bloqueadas.append(horas_base[idx+1])
+                bloqueadas.append(h_db)
+                
+                # Bloqueo de 1 hora si es servicio largo
+                if "BARBA" in srv.upper() or int(c.get("duracion", 30)) > 30:
+                    try:
+                        h_dt = datetime.strptime(h_db, "%I:%M%p" if "m" in h_db else "%H:%M")
+                        prox = (h_dt + timedelta(minutes=30)).strftime("%I:%M%p").lower().lstrip('0')
+                        bloqueadas.append(prox)
+                    except: pass
 
-        # 3. Filtrar y devolver
+        # 3. Filtrar y devolver formato bonito
         ahora = datetime.now(TZ).replace(tzinfo=None)
-        res = []
+        resultado = []
         for h in horas_base:
-            h_dt = datetime.combine(f_obj, datetime.strptime(h, "%I:%M%p").time())
-            if h_dt > (ahora + timedelta(minutes=10)) and h not in bloqueadas:
-                res.append(datetime.strptime(h, "%I:%M%p").strftime("%I:%M %p").upper())
+            h_time = datetime.strptime(h, "%I:%M%p").time()
+            dt_cita = datetime.combine(f_obj, h_time)
+            
+            # Solo si no ha pasado y NO está bloqueada
+            if dt_cita > (ahora + timedelta(minutes=15)) and h not in bloqueadas:
+                resultado.append(datetime.strptime(h, "%I:%M%p").strftime("%I:%M %p").upper())
         
-        return jsonify(res)
+        return jsonify(resultado)
+
     except Exception as e:
-        print(f"DEBUG ERROR HORAS: {e}")
+        print(f"Error Horas: {e}")
         return jsonify([])
 
 @app.route("/cancelar", methods=["POST"])
