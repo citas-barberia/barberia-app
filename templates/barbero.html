@@ -138,51 +138,71 @@ function precioAInt(p) {
     return parseInt(String(p).replace(/[^0-9]/g, '')) || 0;
 }
 
-function aplicarFiltros(citas) {
-    const solo = document.getElementById("solo").value;
-    const estado = document.getElementById("estado").value;
-    const q = (document.getElementById("q").value || "").toLowerCase();
-    
+// 1. Obtener fechas exactas para comparar
+function getFechas() {
     const d = new Date();
-    // Formato que estamos usando ahora: "21/03/2026"
-    const hoyFormat = `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
-
-    let base = [...citas];
-
-    // FILTRO DE DÍA: Buscamos si el texto de la fecha contiene el día de hoy
-    if (solo === "hoy") {
-        base = base.filter(c => String(c.fecha).includes(hoyFormat));
-    }
-
-    // FILTRO DE ESTADO
-    if (estado === "activas") base = base.filter(c => !["CITA CANCELADA", "CITA ATENDIDA"].includes(c.servicio));
-    if (estado === "atendidas") base = base.filter(c => c.servicio === "CITA ATENDIDA");
-    if (estado === "canceladas") base = base.filter(c => c.servicio === "CITA CANCELADA");
-
-    if (q) {
-        base = base.filter(c => String(c.cliente || "").toLowerCase().includes(q));
-    }
-
-    // ACTUALIZAMOS LAS ESTADÍSTICAS CON LO QUE QUEDÓ FILTRADO
-    actualizarStats(base); 
-    renderCitas(base);
+    const hoy = `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+    
+    const m = new Date();
+    m.setDate(m.getDate() + 1);
+    const manana = `${String(m.getDate()).padStart(2,"0")}/${String(m.getMonth()+1).padStart(2,"0")}/${m.getFullYear()}`;
+    
+    return { hoy, manana };
 }
 
-function actualizarStats(citasFiltradas) {
-    const cant_total = citasFiltradas.length;
-    const cant_atendidas = citasFiltradas.filter(c => c.servicio === "CITA ATENDIDA").length;
-    
-    // Sumamos el total de las que están en pantalla y dicen ATENDIDA
-    const total_atendido = citasFiltradas
+// 2. Filtro Inteligente (Punto 3 y 4 corregidos)
+function aplicarFiltros(citas) {
+    const solo = document.getElementById("solo").value; // hoy, manana, todas
+    const estado = document.getElementById("estado").value; // activas, atendidas, canceladas, todas
+    const q = (document.getElementById("q").value || "").toLowerCase();
+    const { hoy, manana } = getFechas();
+
+    let filtradas = [...citas];
+
+    // --- FILTRO DE TIEMPO ESTRICTO ---
+    if (solo === "hoy") {
+        filtradas = filtradas.filter(c => String(c.fecha).includes(hoy));
+    } else if (solo === "manana") {
+        filtradas = filtradas.filter(c => String(c.fecha).includes(manana));
+    }
+    // Si es "todas", no filtramos por fecha.
+
+    // --- FILTRO DE ESTADO ---
+    if (estado === "activas") {
+        filtradas = filtradas.filter(c => !["CITA CANCELADA", "CITA ATENDIDA"].includes(c.servicio));
+    } else if (estado === "atendidas") {
+        filtradas = filtradas.filter(c => c.servicio === "CITA ATENDIDA");
+    } else if (estado === "canceladas") {
+        filtradas = filtradas.filter(c => c.servicio === "CITA CANCELADA");
+    }
+
+    // --- BÚSQUEDA POR NOMBRE ---
+    if (q) {
+        filtradas = filtradas.filter(c => String(c.cliente || "").toLowerCase().includes(q));
+    }
+
+    // 3. ACTUALIZAR TODO BASADO SOLO EN LO FILTRADO
+    actualizarStats(filtradas); 
+    renderCitas(filtradas);
+}
+
+// 4. Estadísticas Dinámicas (Punto 1 y 2 corregidos)
+function actualizarStats(citasVisibles) {
+    const cant_total = citasVisibles.length;
+    const cant_activas = citasVisibles.filter(c => !["CITA CANCELADA", "CITA ATENDIDA"].includes(c.servicio)).length;
+    const cant_atendidas = citasVisibles.filter(c => c.servicio === "CITA ATENDIDA").length;
+    const cant_canceladas = citasVisibles.filter(c => c.servicio === "CITA CANCELADA").length;
+
+    // Suma solo el dinero de lo que se está viendo en pantalla
+    const total_dinero = citasVisibles
         .filter(c => c.servicio === "CITA ATENDIDA")
         .reduce((acc, c) => acc + precioAInt(c.precio), 0);
 
     document.getElementById("v_total").textContent = cant_total;
+    document.getElementById("v_activas").textContent = cant_activas;
     document.getElementById("v_atendidas").textContent = cant_atendidas;
-    document.getElementById("v_total_cobrado").textContent = "₡" + total_atendido.toLocaleString('es-CR');
-    
-    // Estos los podés dejar fijos o calcularlos igual
-    document.getElementById("v_activas").textContent = citasFiltradas.filter(c => !["CITA CANCELADA", "CITA ATENDIDA"].includes(c.servicio)).length;
+    document.getElementById("v_canceladas").textContent = cant_canceladas;
+    document.getElementById("v_total_cobrado").textContent = "₡" + total_dinero.toLocaleString('es-CR');
 }
 
 function renderCitas(citas){

@@ -145,43 +145,49 @@ def guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fe
 
 def leer_citas_db():
     url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/citas"
+    
+    # Optimizamos: Traemos solo lo necesario para que cargue rápido (Punto 5)
+    hoy = _now_cr()
+    inicio_mes = hoy.replace(day=1).strftime("%Y-%m-%d")
+    
     params = {
         "select": "*",
+        "fecha": f"gte.{inicio_mes}",
         "order": "fecha.asc,hora.asc"
     }
+    
     data = _supabase_request("GET", url, params=params)
     if data is None: return None
     
     citas_procesadas = []
-    # Lista de días en español
-    dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    dias_semana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
     
     for r in data:
-        # --- Lógica de Hora ---
-        hora_original = str(r.get("hora", ""))
+        # Hora bonita
+        hora_raw = str(r.get("hora", ""))
         try:
-            hora_obj = datetime.strptime(hora_original, "%H:%M")
-            hora_bonita = hora_obj.strftime("%I:%M %p").lower()
+            h_obj = datetime.strptime(hora_raw, "%H:%M")
+            hora_bonita = h_obj.strftime("%I:%M %p").lower()
         except:
-            hora_bonita = hora_original
+            hora_bonita = hora_raw
 
-        # --- Lógica de Fecha con Día de la Semana ---
-        fecha_raw = str(r.get("fecha", ""))
+        # Fecha bonita con día
+        f_raw = str(r.get("fecha", ""))
         try:
-            fecha_obj = datetime.strptime(fecha_raw, "%Y-%m-%d")
-            # Esto genera: "Lunes 23/03/2026"
-            fecha_bonita = f"{dias[fecha_obj.weekday()]} {fecha_obj.strftime('%d/%m/%Y')}"
+            f_obj = datetime.strptime(f_raw, "%Y-%m-%d")
+            fecha_bonita = f"{dias_semana[f_obj.weekday()]} {f_obj.strftime('%d/%m/%Y')}"
         except:
-            fecha_bonita = fecha_raw
+            fecha_bonita = f_raw
 
         citas_procesadas.append({
-            "id": r.get("id"), 
-            "cliente": r.get("cliente", ""), 
-            "cliente_id": r.get("cliente_id", ""), 
-            "barbero": r.get("barbero", ""), 
-            "servicio": r.get("servicio", ""), 
-            "precio": str(r.get("precio", "")), 
-            "fecha": fecha_bonita, # <-- Pasamos la fecha con el nombre del día
+            "id": r.get("id"),
+            "cliente": r.get("cliente", ""),
+            "cliente_id": r.get("cliente_id", ""),
+            "barbero": r.get("barbero", ""),
+            "servicio": r.get("servicio", ""),
+            "precio": r.get("precio", 0),
+            "fecha": fecha_bonita,
+            "fecha_iso": f_raw, # Guardamos la original para filtros exactos
             "hora": hora_bonita,
             "duracion": str(r.get("duracion", "30"))
         })
@@ -420,7 +426,20 @@ def barbero():
     clave = request.args.get("clave")
     if barbero_autenticado() or clave == CLAVE_BARBERO:
         citas = leer_citas()
-        stats = {"cant_total": len(citas), "cant_activas": sum(1 for c in citas if c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]), "total_atendido": sum(_precio_a_int(c.get("precio")) for c in citas if c.get("servicio") == "CITA ATENDIDA"), "nombre": NOMBRE_BARBERO}
+        hoy_iso = _now_cr().strftime("%Y-%m-%d")
+        
+        # Filtramos solo las de hoy para los stats iniciales
+        citas_hoy = [c for c in citas if c.get("fecha_iso") == hoy_iso]
+        
+        stats = {
+            "cant_total": len(citas_hoy),
+            "cant_activas": sum(1 for c in citas_hoy if c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]),
+            "cant_atendidas": sum(1 for c in citas_hoy if c.get("servicio") == "CITA ATENDIDA"),
+            "cant_canceladas": sum(1 for c in citas_hoy if c.get("servicio") == "CITA CANCELADA"),
+            "total_atendido": sum(_precio_a_int(c.get("precio")) for c in citas_hoy if c.get("servicio") == "CITA ATENDIDA"),
+            "nombre": NOMBRE_BARBERO
+        }
+        
         resp = make_response(render_template("barbero.html", citas=citas, stats=stats))
         resp.set_cookie("clave_barbero", CLAVE_BARBERO, max_age=60*60*24*7)
         return resp
@@ -431,6 +450,7 @@ def citas_json():
     return jsonify({"citas": leer_citas()})
 
 if __name__ == "__main__":
-    app.run(debug=True)
-
+    # Importante para que Render detecte el puerto correctamente
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
 
