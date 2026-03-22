@@ -313,63 +313,70 @@ def index():
 @app.route("/horas")
 def horas():
     try:
-        fecha_str = request.args.get('fecha') # Viene "2026-03-21"
+        fecha_str = request.args.get('fecha')
         if not fecha_str: return jsonify([])
 
         f_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
         ahora_cr = datetime.now(TZ)
         hoy_iso = ahora_cr.strftime("%Y-%m-%d")
 
-        # 1. GENERAR HORAS SEGÚN DÍA
+        # 1. Configurar horario según el día
         dia_semana = f_obj.weekday()
         if dia_semana == 6: h_inicio, h_fin = 9, 16
         elif dia_semana in [4, 5]: h_inicio, h_fin = 8, 20
         else: h_inicio, h_fin = 9, 20
 
-        horas_base = []
+        # 2. Generar horas base normalizadas (ej: "9:00am")
+        horas_base_raw = []
         actual = datetime.combine(f_obj.date(), datetime.min.time()).replace(hour=h_inicio)
         fin_jornada = datetime.combine(f_obj.date(), datetime.min.time()).replace(hour=h_fin)
 
         while actual < fin_jornada:
-            horas_base.append(actual.strftime("%I:%M %p").lower())
+            # Quitamos el cero inicial con lstrip('0') para que "09:00 AM" sea "9:00 am"
+            h_formateada = actual.strftime("%I:%M%p").lower().lstrip('0')
+            horas_base_raw.append(h_formateada)
             actual += timedelta(minutes=30)
 
-        # 2. FILTRAR POR PASADO (Arregla punto 1)
-        # Si la fecha es HOY, quitamos las horas que ya pasaron
+        # 3. Bloquear pasado si es hoy
         if fecha_str == hoy_iso:
-            # Damos 30 min de margen para que no agenden "para ya"
-            limite = ahora_cr + timedelta(minutes=30)
-            horas_base = [h for h in horas_base if _hora_ampm_a_time(h) > limite.time()]
+            limite = ahora_cr + timedelta(minutes=15)
+            horas_base_raw = [h for h in horas_base_raw if _hora_ampm_a_time(h) > limite.time()]
         elif fecha_str < hoy_iso:
-            # Si es un día pasado, no hay nada disponible
             return jsonify([])
 
-        # 3. BLOQUEAR CITAS EXISTENTES (Arregla punto 2)
-        citas = leer_citas() 
+        # 4. LEER CITAS Y NORMALIZAR PARA COMPARAR
+        citas = leer_citas()
         bloqueadas = []
-        # El pedacito de fecha que sale en la DB (ej: "22/03/2026")
         fecha_comparar = f_obj.strftime("%d/%m/%Y") 
 
         for c in citas:
-            # Solo si la fecha está en el texto y no está cancelada/atendida
+            # Verificamos si la fecha coincide (ej: "22/03/2026")
             if fecha_comparar in str(c.get("fecha", "")) and c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]:
-                h_cita = str(c.get("hora", "")).lower().strip()
-                bloqueadas.append(h_cita)
+                # Normalizamos la hora de la DB: "09:00 AM" -> "9:00am"
+                h_db = str(c.get("hora", "")).lower().replace(" ", "").lstrip('0')
+                bloqueadas.append(h_db)
                 
-                # Bloquear bloque extra para servicios largos (1 hora)
-                if "Corte y Barba" in str(c.get("servicio", "")):
+                # Si es un servicio largo, bloqueamos la siguiente media hora
+                if int(c.get("duracion", 30)) > 30:
                     try:
-                        h_dt = datetime.strptime(h_cita, "%I:%M %p")
-                        proxima = (h_dt + timedelta(minutes=30)).strftime("%I:%M %p").lower()
+                        h_dt = datetime.strptime(h_db, "%H:%M" if ":" in h_db and "m" not in h_db else "%I:%M%p")
+                        proxima = (h_dt + timedelta(minutes=30)).strftime("%I:%M%p").lower().lstrip('0')
                         bloqueadas.append(proxima)
                     except: pass
 
-        # 4. RESULTADO FINAL
-        disponibles = [h.upper() for h in horas_base if h.lower().strip() not in bloqueadas]
-        return jsonify(disponibles)
+        # 5. Filtrar y devolver en formato bonito para el cliente
+        # Solo dejamos las que NO están en la lista de bloqueadas
+        resultado = []
+        for h in horas_base_raw:
+            if h not in bloqueadas:
+                # Volvemos a poner el formato lindo "09:00 AM" para el selector
+                h_obj = datetime.strptime(h, "%I:%M%p")
+                resultado.append(h_obj.strftime("%I:%M %p").upper())
+        
+        return jsonify(resultado)
 
     except Exception as e:
-        print(f"❌ Error en /horas: {e}")
+        print(f"❌ Error crítico en /horas: {e}")
         return jsonify([])
 
 @app.route("/cancelar", methods=["POST"])
