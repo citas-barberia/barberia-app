@@ -270,7 +270,7 @@ def index():
 
 @app.route("/horas")
 def horas():
-    try:
+    
         fecha_str = request.args.get('fecha')
         if not fecha_str: return jsonify([])
         f_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
@@ -299,11 +299,13 @@ def horas():
         res = []
         for h in horas_base:
             h_dt = datetime.strptime(h, "%H:%M:%S")
-            if datetime.combine(f_obj, h_dt.time()) > (ahora_cr + timedelta(minutes=10)):
+            # --- CAMBIO AQUÍ: Colchón de 30 minutos ---
+            # Comparamos la cita contra (Hora actual + 30 min)
+            if datetime.combine(f_obj, h_dt.time()) > (ahora_cr + timedelta(minutes=30)):
                 if h not in ocupadas:
                     res.append(h_dt.strftime("%I:%M %p").upper().lstrip('0'))
+                    
         return jsonify(res)
-    except: return jsonify([])
 
 @app.route("/cancelar", methods=["POST"])
 def cancelar():
