@@ -352,62 +352,58 @@ def leer_citas_fuerza_bruta():
 @app.route("/horas")
 def horas():
     try:
-        fecha_str = request.args.get('fecha') # Viene "2026-03-22"
+        fecha_str = request.args.get('fecha') # "2026-03-22"
         if not fecha_str: return jsonify([])
 
         f_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
         ahora_cr = datetime.now(TZ).replace(tzinfo=None)
 
-        # 1. Horario estricto (Mañana es Domingo: 9am-4pm)
+        # 1. Horario Domingo: 9:00 AM a 4:00 PM
         dia_semana = f_obj.weekday()
         if dia_semana == 6: h_i, h_f = 9, 16
         elif dia_semana in [4, 5]: h_i, h_f = 8, 20
         else: h_i, h_f = 9, 20
 
-        # 2. Generar horas base (Formato para comparar: "09:00:00")
-        horas_base_db = [] 
+        # 2. Generar todas las horas posibles
+        horas_base = []
         temp = datetime.combine(f_obj, datetime.min.time()).replace(hour=h_i)
         fin = datetime.combine(f_obj, datetime.min.time()).replace(hour=h_f)
-        
         while temp < fin:
-            horas_base_db.append(temp.strftime("%H:%M:%00")) # Genera "09:00:00"
+            horas_base.append(temp.strftime("%H:%M:00")) # Formato DB "09:00:00"
             temp += timedelta(minutes=30)
 
-        # 3. BLOQUEO REAL (Comparando contra el formato de Supabase)
+        # 3. Leer citas y marcar SOLO las ocupadas
         citas = leer_citas_fuerza_bruta()
-        bloqueadas = []
-        fecha_iso = fecha_str # "2026-03-22"
-
+        ocupadas = set()
+        
         for c in citas:
-            f_db = str(c.get("fecha", ""))
-            srv = str(c.get("servicio", ""))
-            # Si la fecha coincide y la cita está activa
-            if fecha_iso in f_db and "CANCELADA" not in srv.upper() and "ATENDIDA" not in srv.upper():
-                h_db = str(c.get("hora", "")) # Viene "10:30:00"
-                bloqueadas.append(h_db)
+            # Validar fecha y que la cita no esté cancelada
+            if str(c.get("fecha")) == fecha_str and "CANCELADA" not in str(c.get("servicio")).upper():
+                h_db = str(c.get("hora")) # Ej: "10:00:00"
+                ocupadas.add(h_db)
                 
-                # Bloqueo de 1 hora si es Corte y Barba (Andres Madrigal)
-                if "BARBA" in srv.upper() or int(c.get("duracion", 30)) > 30:
+                # SOLO si es "Corte y Barba" bloqueamos el siguiente espacio
+                # (Porque dura 1 hora, los demás duran 30 min)
+                if "BARBA" in str(c.get("servicio")).upper():
                     try:
-                        h_dt = datetime.strptime(h_db, "%H:%M:%S")
-                        prox = (h_dt + timedelta(minutes=30)).strftime("%H:%M:%S")
-                        bloqueadas.append(prox)
+                        dt_h = datetime.strptime(h_db, "%H:%M:%S")
+                        prox = (dt_h + timedelta(minutes=30)).strftime("%H:%M:%S")
+                        ocupadas.add(prox)
                     except: pass
 
-        # 4. Filtrar y devolver bonito al cliente
+        # 4. Filtrar y mostrar al cliente
         res = []
-        for h_db in horas_base_db:
-            h_time = datetime.strptime(h_db, "%H:%M:%S").time()
-            if datetime.combine(f_obj, h_time) > (ahora_cr + timedelta(minutes=15)):
-                if h_db not in bloqueadas:
-                    # Convertimos "10:30:00" a "10:30 AM" para el cliente
-                    res.append(datetime.strptime(h_db, "%H:%M:%S").strftime("%I:%M %p").upper())
+        for h in horas_base:
+            h_dt = datetime.strptime(h, "%H:%M:%S")
+            # Si no ha pasado la hora (margen 10 min) y NO está en ocupadas
+            if datetime.combine(f_obj, h_dt.time()) > (ahora_cr + timedelta(minutes=10)):
+                if h not in ocupadas:
+                    res.append(h_dt.strftime("%I:%M %p").upper().lstrip('0'))
         
         return jsonify(res)
     except Exception as e:
-        print(f"ERROR: {e}")
+        print(f"Error: {e}")
         return jsonify([])
-
 @app.route("/cancelar", methods=["POST"])
 def cancelar():
     id_cita = request.form.get("id")
