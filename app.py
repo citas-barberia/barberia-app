@@ -328,80 +328,82 @@ def index():
     resp.set_cookie("cliente_id", cliente_id, max_age=60*60*24*365)
     return resp
 
+def leer_citas_fuerza_bruta():
+    try:
+        url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/citas"
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json"
+        }
+        # Traemos TODO lo de marzo para no fallar
+        url_filtered = f"{url}?fecha=gte.2026-03-01&select=*"
+
+        r = requests.get(url_filtered, headers=headers, timeout=10)
+        data = r.json() if r.status_code == 200 else []
+        
+        # ESTO ES VITAL: Vamos a ver en los logs qué está llegando
+        print(f"DEBUG: Se encontraron {len(data)} citas en Supabase")
+        return data
+    except Exception as e:
+        print(f"❌ ERROR LEYENDO DB: {e}")
+        return []
+
 @app.route("/horas")
 def horas():
     try:
-        fecha_str = request.args.get('fecha') # Viene como "2026-03-22"
+        fecha_str = request.args.get('fecha') # "2026-03-22"
         if not fecha_str: return jsonify([])
 
         f_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
-        # Formatos de fecha que pueden estar en la DB (Día DD/MM/YYYY o YYYY-MM-DD)
-        fecha_comparar_bonita = f_obj.strftime("%d/%m/%Y") 
-        fecha_comparar_iso = fecha_str
+        # Formatos posibles en la DB
+        f_comp1 = f_obj.strftime("%d/%m/%Y") # "22/03/2026"
+        f_comp2 = fecha_str                  # "2026-03-22"
 
-        ahora_cr = datetime.now(TZ).replace(tzinfo=None)
+        # 1. Generar horas del día (9am a 8pm por defecto para Junior)
+        horas_base = []
+        temp = datetime.combine(f_obj, datetime.min.time()).replace(hour=8)
+        while temp.hour < 20:
+            # Formato ultra-limpio: "9:00am"
+            horas_base.append(temp.strftime("%I:%M%p").lower().lstrip('0'))
+            temp += timedelta(minutes=30)
 
-        # 1. Configurar horario según el día de la semana
-        dia_semana = f_obj.weekday()
-        if dia_semana == 6: h_inicio, h_fin = 9, 16 # Domingo
-        elif dia_semana in [4, 5]: h_inicio, h_fin = 8, 20 # Viernes/Sábado
-        else: h_inicio, h_fin = 9, 20 # Lunes-Jueves
-
-        # 2. Generar horas base normalizadas (ej: "9:00am")
-        horas_base_limpias = []
-        actual = datetime.combine(f_obj, datetime.min.time()).replace(hour=h_inicio)
-        fin_jornada = datetime.combine(f_obj, datetime.min.time()).replace(hour=h_fin)
-        
-        while actual < fin_jornada:
-            # Normalizamos a "9:00am" (sin espacios, sin cero a la izquierda, minúscula)
-            h_formato_match = actual.strftime("%I:%M%p").lower().lstrip('0')
-            horas_base_limpias.append(h_formato_match)
-            actual += timedelta(minutes=30)
-
-        # 3. LEER CITAS CON FUERZA BRUTA Y BLOQUEAR
+        # 2. BLOQUEO TOTAL
         citas = leer_citas_fuerza_bruta()
         bloqueadas = []
         
         for c in citas:
             f_db = str(c.get("fecha", ""))
-            # Si la fecha coincide en cualquier formato y la cita no está cancelada/atendida
-            if (fecha_comparar_bonita in f_db or fecha_comparar_iso in f_db) and \
-               c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]:
-                
-                # NORMALIZACIÓN AGRESIVA DE LA HORA EN DB
-                # Pasa "09:00 AM " -> "9:00am"
-                h_db = str(c.get("hora", "")).lower().replace(" ", "").lstrip('0')
-                bloqueadas.append(h_db)
-                
-                # Bloqueo automático de 1 hora para "Corte y Barba" o servicios largos
-                try:
-                    duracion = int(c.get("duracion", 30))
-                    if duracion > 30:
-                        # Calculamos la siguiente media hora para bloquearla también
-                        # Intentamos parsear la hora que normalizamos
-                        h_dt = datetime.strptime(h_db, "%I:%M%p")
-                        proxima = (h_dt + timedelta(minutes=30)).strftime("%I:%M%p").lower().lstrip('0')
-                        bloqueadas.append(proxima)
-                except:
-                    pass
-
-        # 4. Filtrar Pasado y Ocupadas para devolver al cliente
-        resultado_final = []
-        for h_limpia in horas_base_limpias:
-            # Convertimos de vuelta a objeto tiempo para chequear si ya pasó
-            h_obj = datetime.strptime(h_limpia, "%I:%M%p")
-            dt_cita = datetime.combine(f_obj, h_obj.time())
+            srv = str(c.get("servicio", ""))
             
-            # Solo si faltan más de 15 min y NO está bloqueada
-            if dt_cita > (ahora_cr + timedelta(minutes=15)):
-                if h_limpia not in bloqueadas:
-                    # Devolvemos formato bonito "09:00 AM" para el selector
-                    resultado_final.append(h_obj.strftime("%I:%M %p").upper())
-        
-        return jsonify(resultado_final)
+            # Si la fecha coincide y NO está cancelada
+            if (f_comp1 in f_db or f_comp2 in f_db) and "CANCELADA" not in srv.upper() and "ATENDIDA" not in srv.upper():
+                # Limpiamos la hora de la DB a muerte: "09:00 AM" -> "9:00am"
+                h_db = str(c.get("hora", "")).lower().replace(" ", "").lstrip('0')
+                if ":" in h_db:
+                    h_db = h_db[:5] if "m" not in h_db else h_db # Limpia "09:00:00"
+                
+                # Buscamos coincidencias
+                for h_b in horas_base:
+                    if h_db in h_b or h_b in h_db:
+                        bloqueadas.append(h_b)
+                        # Si es servicio largo, bloqueamos la siguiente
+                        if "BARBA" in srv.upper() or int(c.get("duracion", 30)) > 30:
+                            idx = horas_base.index(h_b)
+                            if idx + 1 < len(horas_base):
+                                bloqueadas.append(horas_base[idx+1])
 
+        # 3. Filtrar y devolver
+        ahora = datetime.now(TZ).replace(tzinfo=None)
+        res = []
+        for h in horas_base:
+            h_dt = datetime.combine(f_obj, datetime.strptime(h, "%I:%M%p").time())
+            if h_dt > (ahora + timedelta(minutes=10)) and h not in bloqueadas:
+                res.append(datetime.strptime(h, "%I:%M%p").strftime("%I:%M %p").upper())
+        
+        return jsonify(res)
     except Exception as e:
-        print(f"❌ Error crítico en /horas: {e}")
+        print(f"DEBUG ERROR HORAS: {e}")
         return jsonify([])
 
 @app.route("/cancelar", methods=["POST"])
