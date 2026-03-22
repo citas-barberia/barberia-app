@@ -150,12 +150,19 @@ function aplicarFiltros(citas){
   const solo = document.getElementById("solo").value;
   const estado = document.getElementById("estado").value;
   const q = (document.getElementById("q").value || "").toLowerCase();
-  const hoy = isoHoy();
-  const manana = isoManana();
+  
+  // Obtenemos fecha de hoy y mañana en formato DD/MM/YYYY
+  const d = new Date();
+  const hoyFormat = `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+  
+  const m = new Date(); m.setDate(m.getDate() + 1);
+  const mananaFormat = `${String(m.getDate()).padStart(2,"0")}/${String(m.getMonth()+1).padStart(2,"0")}/${m.getFullYear()}`;
+
   let base = [...citas];
 
-  if(solo === "hoy") base = base.filter(c => String(c.fecha) === hoy);
-  if(solo === "manana") base = base.filter(c => String(c.fecha) === manana);
+  // Filtro por día (busca el pedacito DD/MM/YYYY dentro del texto "Lunes 23/03/2026")
+  if(solo === "hoy") base = base.filter(c => String(c.fecha).includes(hoyFormat));
+  if(solo === "manana") base = base.filter(c => String(c.fecha).includes(mananaFormat));
 
   if(estado === "activas") base = base.filter(c => !["CITA CANCELADA","CITA ATENDIDA"].includes(c.servicio));
   if(estado === "atendidas") base = base.filter(c => c.servicio === "CITA ATENDIDA");
@@ -164,8 +171,7 @@ function aplicarFiltros(citas){
   if(q){
     base = base.filter(c => String(c.cliente||"").toLowerCase().includes(q) || String(c.servicio||"").toLowerCase().includes(q));
   }
-  base.sort((a,b) => String(a.fecha).localeCompare(String(b.fecha)) || String(a.hora).localeCompare(String(b.hora)));
-  return { base, solo, hoy, manana };
+  return { base, solo, hoyFormat, mananaFormat };
 }
 
 function actualizarStats(citasDia){

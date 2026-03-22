@@ -145,7 +145,6 @@ def guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fe
 
 def leer_citas_db():
     url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/citas"
-    # CAMBIO: Agregamos orden por fecha y hora ascendente
     params = {
         "select": "*",
         "order": "fecha.asc,hora.asc"
@@ -154,20 +153,36 @@ def leer_citas_db():
     if data is None: return None
     
     citas_procesadas = []
+    # Lista de días en español
+    dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    
     for r in data:
+        # --- Lógica de Hora ---
         hora_original = str(r.get("hora", ""))
-        # Convertimos la hora de 24h a 12h para que Junior la vea bonita
         try:
             hora_obj = datetime.strptime(hora_original, "%H:%M")
             hora_bonita = hora_obj.strftime("%I:%M %p").lower()
         except:
             hora_bonita = hora_original
 
+        # --- Lógica de Fecha con Día de la Semana ---
+        fecha_raw = str(r.get("fecha", ""))
+        try:
+            fecha_obj = datetime.strptime(fecha_raw, "%Y-%m-%d")
+            # Esto genera: "Lunes 23/03/2026"
+            fecha_bonita = f"{dias[fecha_obj.weekday()]} {fecha_obj.strftime('%d/%m/%Y')}"
+        except:
+            fecha_bonita = fecha_raw
+
         citas_procesadas.append({
-            "id": r.get("id"), "cliente": r.get("cliente", ""), 
-            "cliente_id": r.get("cliente_id", ""), "barbero": r.get("barbero", ""), 
-            "servicio": r.get("servicio", ""), "precio": str(r.get("precio", "")), 
-            "fecha": str(r.get("fecha", "")), "hora": hora_bonita,
+            "id": r.get("id"), 
+            "cliente": r.get("cliente", ""), 
+            "cliente_id": r.get("cliente_id", ""), 
+            "barbero": r.get("barbero", ""), 
+            "servicio": r.get("servicio", ""), 
+            "precio": str(r.get("precio", "")), 
+            "fecha": fecha_bonita, # <-- Pasamos la fecha con el nombre del día
+            "hora": hora_bonita,
             "duracion": str(r.get("duracion", "30"))
         })
     return citas_procesadas
