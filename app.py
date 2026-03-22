@@ -270,21 +270,33 @@ def index():
 
 @app.route("/horas")
 def horas():
-    
+    try:
         fecha_str = request.args.get('fecha')
         if not fecha_str: return jsonify([])
+        
         f_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+        hoy_cr = datetime.now(TZ).date()
         ahora_cr = datetime.now(TZ).replace(tzinfo=None)
+
+        # 1. BLOQUEO: No mostrar horas si el día ya pasó
+        if f_obj < hoy_cr:
+            return jsonify([])
+
+        # 2. Horario de Kevin (Domingo 9-4, Otros varía)
         dia_semana = f_obj.weekday()
         if dia_semana == 6: h_i, h_f = 9, 16
         elif dia_semana in [4, 5]: h_i, h_f = 8, 20
         else: h_i, h_f = 9, 20
+
+        # 3. Generar horas base
         horas_base = []
         temp = datetime.combine(f_obj, datetime.min.time()).replace(hour=h_i)
         fin = datetime.combine(f_obj, datetime.min.time()).replace(hour=h_f)
         while temp < fin:
             horas_base.append(temp.strftime("%H:%M:00"))
             temp += timedelta(minutes=30)
+
+        # 4. Leer ocupadas
         citas = leer_citas_fuerza_bruta()
         ocupadas = set()
         for c in citas:
@@ -296,16 +308,20 @@ def horas():
                         dt_h = datetime.strptime(h_db, "%H:%M:%S") if ":" in h_db else datetime.strptime(h_db, "%H:%M")
                         ocupadas.add((dt_h + timedelta(minutes=30)).strftime("%H:%M:%S"))
                     except: pass
+
+        # 5. Filtrar con el COLCHÓN DE 30 MINUTOS
         res = []
         for h in horas_base:
             h_dt = datetime.strptime(h, "%H:%M:%S")
-            # --- CAMBIO AQUÍ: Colchón de 30 minutos ---
-            # Comparamos la cita contra (Hora actual + 30 min)
+            # Solo si falta más de 30 min para la cita
             if datetime.combine(f_obj, h_dt.time()) > (ahora_cr + timedelta(minutes=30)):
                 if h not in ocupadas:
                     res.append(h_dt.strftime("%I:%M %p").upper().lstrip('0'))
                     
         return jsonify(res)
+    except Exception as e:
+        print(f"Error en horas: {e}")
+        return jsonify([])
 
 @app.route("/cancelar", methods=["POST"])
 def cancelar():
