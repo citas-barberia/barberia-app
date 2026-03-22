@@ -317,58 +317,52 @@ def horas():
         if not fecha_str: return jsonify([])
 
         f_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
-        fecha_comparar = f_obj.strftime("%d/%m/%Y") 
-        ahora_cr = datetime.now(TZ).replace(tzinfo=None)
+        # Formatos de fecha que podrían estar en la DB
+        f_comp1 = f_obj.strftime("%d/%m/%Y") 
+        f_comp2 = fecha_str
 
-        # 1. Horario según día
+        # 1. Generar horas base y pasarlas de una vez a minúscula y sin espacios
+        horas_base = []
+        # ... (lógica de h_inicio y h_fin igual que antes) ...
         dia_semana = f_obj.weekday()
         h_inicio, h_fin = (9, 16) if dia_semana == 6 else ((8, 20) if dia_semana in [4, 5] else (9, 20))
-
-        # 2. Generar horas base y NORMALIZARLAS (ej: "9:00am")
-        # Les quitamos espacios, el cero inicial y las pasamos a minúscula
-        horas_base_limpias = []
+        
         temp = datetime.combine(f_obj, datetime.min.time()).replace(hour=h_inicio)
         fin = datetime.combine(f_obj, datetime.min.time()).replace(hour=h_fin)
         
         while temp < fin:
-            h_raw = temp.strftime("%I:%M%p").lower().lstrip('0') # "9:00am"
-            horas_base_limpias.append(h_raw)
+            # Generamos "9:00am" (minúscula y sin espacio)
+            horas_base.append(temp.strftime("%I:%M%p").lower().lstrip('0'))
             temp += timedelta(minutes=30)
 
-        # 3. Leer citas y NORMALIZAR las de la DB
+        # 2. Leer citas y limpiar la hora de la DB "a huevo"
         citas = leer_citas()
         bloqueadas = []
         for c in citas:
             f_db = str(c.get("fecha", ""))
-            # Si la fecha coincide (buscando el 22/03/2026 dentro del texto)
-            if fecha_comparar in f_db and c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]:
-                # NORMALIZACIÓN AGRESIVA: "09:00 AM " -> "9:00am"
+            if (f_comp1 in f_db or f_comp2 in f_db) and c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]:
+                # LIMPIEZA TOTAL: "09:00 AM " -> "9:00am"
                 h_db = str(c.get("hora", "")).lower().replace(" ", "").lstrip('0')
                 bloqueadas.append(h_db)
                 
-                # Bloqueo doble si es servicio largo
-                if "Corte y Barba" in str(c.get("servicio", "")):
+                # Bloqueo doble
+                if int(c.get("duracion", 30)) > 30:
                     try:
-                        # Intentamos calcular la siguiente media hora
-                        h_obj = datetime.strptime(h_db, "%I:%M%p")
-                        proxima = (h_obj + timedelta(minutes=30)).strftime("%I:%M%p").lower().lstrip('0')
-                        bloqueadas.append(proxima)
+                        h_dt = datetime.strptime(h_db, "%I:%M%p")
+                        bloqueadas.append((h_dt + timedelta(minutes=30)).strftime("%I:%M%p").lower().lstrip('0'))
                     except: pass
 
-        # 4. Filtrar y devolver formato Bonito
+        # 3. Comparar y devolver
         resultado = []
-        for h in horas_base_limpias:
-            # Check de pasado si es hoy
-            h_time = datetime.strptime(h, "%I:%M%p").time()
-            if datetime.combine(f_obj, h_time) > (ahora_cr + timedelta(minutes=15)):
-                # SI NO ESTÁ BLOQUEADA (aquí es donde el case-sensitive ya no importa)
-                if h not in bloqueadas:
-                    # La devolvemos bonita "09:00 AM" para el cliente
-                    resultado.append(datetime.strptime(h, "%I:%M%p").strftime("%I:%M %p").upper())
+        for h in horas_base:
+            # Si "9:00am" no está en ["9:00am", "10:00am"]...
+            if h not in bloqueadas:
+                # La devolvemos bonita "09:00 AM" solo para que el cliente la vea bien
+                h_obj = datetime.strptime(h, "%I:%M%p")
+                resultado.append(h_obj.strftime("%I:%M %p").upper())
 
         return jsonify(resultado)
     except Exception as e:
-        print(f"Error: {e}")
         return jsonify([])
 
 @app.route("/cancelar", methods=["POST"])
