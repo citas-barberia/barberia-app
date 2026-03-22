@@ -313,80 +313,62 @@ def index():
 @app.route("/horas")
 def horas():
     try:
-        fecha_str = request.args.get('fecha') # Viene como "2026-03-22"
+        fecha_str = request.args.get('fecha') # "2026-03-22"
         if not fecha_str: return jsonify([])
 
-        # 1. Convertir fecha del cliente a objeto real
         f_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
-        ahora_cr = datetime.now(TZ)
+        fecha_comparar = f_obj.strftime("%d/%m/%Y") 
+        ahora_cr = datetime.now(TZ).replace(tzinfo=None)
 
-        # 2. Configurar horario del día
+        # 1. Horario según día
         dia_semana = f_obj.weekday()
-        if dia_semana == 6: h_inicio, h_fin = 9, 16
-        elif dia_semana in [4, 5]: h_inicio, h_fin = 8, 20
-        else: h_inicio, h_fin = 9, 20
+        h_inicio, h_fin = (9, 16) if dia_semana == 6 else ((8, 20) if dia_semana in [4, 5] else (9, 20))
 
-        # 3. Generar horas base normalizadas (ej: "09:00 am")
-        horas_base = []
-        actual = datetime.combine(f_obj, datetime.min.time()).replace(hour=h_inicio)
-        fin_jornada = datetime.combine(f_obj, datetime.min.time()).replace(hour=h_fin)
+        # 2. Generar horas base y NORMALIZARLAS (ej: "9:00am")
+        # Les quitamos espacios, el cero inicial y las pasamos a minúscula
+        horas_base_limpias = []
+        temp = datetime.combine(f_obj, datetime.min.time()).replace(hour=h_inicio)
+        fin = datetime.combine(f_obj, datetime.min.time()).replace(hour=h_fin)
+        
+        while temp < fin:
+            h_raw = temp.strftime("%I:%M%p").lower().lstrip('0') # "9:00am"
+            horas_base_limpias.append(h_raw)
+            temp += timedelta(minutes=30)
 
-        while actual < fin_jornada:
-            horas_base.append(actual.strftime("%I:%M %p").lower())
-            actual += timedelta(minutes=30)
-
-        # 4. LEER CITAS Y BLOQUEAR (Lógica Blindada)
+        # 3. Leer citas y NORMALIZAR las de la DB
         citas = leer_citas()
         bloqueadas = []
-
         for c in citas:
-            # --- EL ARREGLO ESTÁ AQUÍ ---
-            # Extraemos CUALQUIER fecha del texto (sea "2026-03-22" o "Domingo 22/03/2026")
-            fecha_cita_raw = str(c.get("fecha", ""))
-            try:
-                # Intentamos extraer solo los números de la fecha del texto de la DB
-                # Buscamos algo que parezca DD/MM/YYYY o YYYY-MM-DD
-                import re
-                match = re.search(r'(\d{2}/\d{2}/\d{4})|(\d{4}-\d{2}-\d{2})', fecha_cita_raw)
-                if match:
-                    fecha_limpia = match.group()
-                    fmt = "%d/%m/%Y" if "/" in fecha_limpia else "%Y-%m-%d"
-                    f_cita_obj = datetime.strptime(fecha_limpia, fmt).date()
-                else:
-                    continue # Si no hay fecha reconocible, saltamos
-            except:
-                continue
-
-            # Si la fecha de la cita coincide con la que el cliente está viendo
-            if f_cita_obj == f_obj and c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]:
-                # Normalizamos la hora para que el match sea exacto
-                h_db = str(c.get("hora", "")).lower().strip()
-                # Si la hora en DB es "09:00 AM", la guardamos tal cual
+            f_db = str(c.get("fecha", ""))
+            # Si la fecha coincide (buscando el 22/03/2026 dentro del texto)
+            if fecha_comparar in f_db and c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]:
+                # NORMALIZACIÓN AGRESIVA: "09:00 AM " -> "9:00am"
+                h_db = str(c.get("hora", "")).lower().replace(" ", "").lstrip('0')
                 bloqueadas.append(h_db)
                 
-                # Bloqueo de 1 hora para servicios largos
+                # Bloqueo doble si es servicio largo
                 if "Corte y Barba" in str(c.get("servicio", "")):
                     try:
-                        h_dt = datetime.strptime(h_db, "%I:%M %p")
-                        proxima = (h_dt + timedelta(minutes=30)).strftime("%I:%M %p").lower()
+                        # Intentamos calcular la siguiente media hora
+                        h_obj = datetime.strptime(h_db, "%I:%M%p")
+                        proxima = (h_obj + timedelta(minutes=30)).strftime("%I:%M%p").lower().lstrip('0')
                         bloqueadas.append(proxima)
                     except: pass
 
-        # 5. Filtrar Pasado + Bloqueadas
+        # 4. Filtrar y devolver formato Bonito
         resultado = []
-        for h in horas_base:
-            h_time = datetime.strptime(h, "%I:%M %p").time()
-            dt_cita = datetime.combine(f_obj, h_time)
-            
-            # Solo si la hora no ha pasado (con 15 min de gracia) y no está bloqueada
-            if dt_cita > ahora_cr.replace(tzinfo=None) + timedelta(minutes=15):
+        for h in horas_base_limpias:
+            # Check de pasado si es hoy
+            h_time = datetime.strptime(h, "%I:%M%p").time()
+            if datetime.combine(f_obj, h_time) > (ahora_cr + timedelta(minutes=15)):
+                # SI NO ESTÁ BLOQUEADA (aquí es donde el case-sensitive ya no importa)
                 if h not in bloqueadas:
-                    resultado.append(h.upper())
-        
-        return jsonify(resultado)
+                    # La devolvemos bonita "09:00 AM" para el cliente
+                    resultado.append(datetime.strptime(h, "%I:%M%p").strftime("%I:%M %p").upper())
 
+        return jsonify(resultado)
     except Exception as e:
-        print(f"❌ ERROR CRÍTICO EN HORAS: {e}")
+        print(f"Error: {e}")
         return jsonify([])
 
 @app.route("/cancelar", methods=["POST"])
