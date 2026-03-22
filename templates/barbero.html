@@ -132,73 +132,57 @@ function formatearHora12h(horaStr) {
     return `${horas}:${minutos} ${ampm}`;
 }
 
-function precioAInt(p){
-  if (!p) return 0;
-  // Esta línea borra cualquier letra o símbolo y deja solo los números para poder sumarlos
-  let limpio = String(p).replace(/[^0-9]/g, ''); 
-  return parseInt(limpio) || 0;
+function precioAInt(p) {
+    if (!p) return 0;
+    // Esto quita el símbolo de colones y cualquier letra, dejando solo el número
+    return parseInt(String(p).replace(/[^0-9]/g, '')) || 0;
 }
 
-function isoHoy(){
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+function aplicarFiltros(citas) {
+    const solo = document.getElementById("solo").value;
+    const estado = document.getElementById("estado").value;
+    const q = (document.getElementById("q").value || "").toLowerCase();
+    
+    const d = new Date();
+    // Formato que estamos usando ahora: "21/03/2026"
+    const hoyFormat = `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+
+    let base = [...citas];
+
+    // FILTRO DE DÍA: Buscamos si el texto de la fecha contiene el día de hoy
+    if (solo === "hoy") {
+        base = base.filter(c => String(c.fecha).includes(hoyFormat));
+    }
+
+    // FILTRO DE ESTADO
+    if (estado === "activas") base = base.filter(c => !["CITA CANCELADA", "CITA ATENDIDA"].includes(c.servicio));
+    if (estado === "atendidas") base = base.filter(c => c.servicio === "CITA ATENDIDA");
+    if (estado === "canceladas") base = base.filter(c => c.servicio === "CITA CANCELADA");
+
+    if (q) {
+        base = base.filter(c => String(c.cliente || "").toLowerCase().includes(q));
+    }
+
+    // ACTUALIZAMOS LAS ESTADÍSTICAS CON LO QUE QUEDÓ FILTRADO
+    actualizarStats(base); 
+    renderCitas(base);
 }
 
-function isoManana(){
-  const d = new Date(); d.setDate(d.getDate()+1);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-}
+function actualizarStats(citasFiltradas) {
+    const cant_total = citasFiltradas.length;
+    const cant_atendidas = citasFiltradas.filter(c => c.servicio === "CITA ATENDIDA").length;
+    
+    // Sumamos el total de las que están en pantalla y dicen ATENDIDA
+    const total_atendido = citasFiltradas
+        .filter(c => c.servicio === "CITA ATENDIDA")
+        .reduce((acc, c) => acc + precioAInt(c.precio), 0);
 
-function aplicarFiltros(citas){
-  const solo = document.getElementById("solo").value;
-  const estado = document.getElementById("estado").value;
-  const q = (document.getElementById("q").value || "").toLowerCase();
-  
-  // Obtenemos la fecha de hoy en dos formatos para asegurar que la encuentre
-  const d = new Date();
-  const hoyISO = d.toISOString().split('T')[0]; // "2026-03-21"
-  const hoyBonito = `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`; // "21/03/2026"
-
-  let base = [...citas];
-
-  // FILTRO POR DÍA (Mejorado)
-  if(solo === "hoy") {
-    base = base.filter(c => 
-      String(c.fecha).includes(hoyISO) || 
-      String(c.fecha).includes(hoyBonito)
-    );
-  }
-
-  // FILTRO POR ESTADO
-  if(estado === "activas") base = base.filter(c => !["CITA CANCELADA","CITA ATENDIDA"].includes(c.servicio));
-  if(estado === "atendidas") base = base.filter(c => c.servicio === "CITA ATENDIDA");
-  if(estado === "canceladas") base = base.filter(c => c.servicio === "CITA CANCELADA");
-
-  // BÚSQUEDA
-  if(q){
-    base = base.filter(c => String(c.cliente||"").toLowerCase().includes(q));
-  }
-
-  return { base, solo };
-}
-
-function actualizarStats(citasDia){
-  const cant_total = citasDia.length;
-  const cant_canceladas = citasDia.filter(c => c.servicio === "CITA CANCELADA").length;
-  const cant_atendidas = citasDia.filter(c => c.servicio === "CITA ATENDIDA").length;
-  const cant_activas = citasDia.filter(c => !["CITA CANCELADA","CITA ATENDIDA"].includes(c.servicio)).length;
-  
-  // Suma correctamente usando la nueva función limpiadora
-  const total_atendido = citasDia
-    .filter(c => c.servicio === "CITA ATENDIDA")
-    .reduce((acc, c) => acc + precioAInt(c.precio), 0);
-
-  document.getElementById("v_total").textContent = cant_total;
-  document.getElementById("v_activas").textContent = cant_activas;
-  document.getElementById("v_atendidas").textContent = cant_atendidas;
-  document.getElementById("v_canceladas").textContent = cant_canceladas;
-  // Le ponemos formato bonito con puntos (₡79.000)
-  document.getElementById("v_total_cobrado").textContent = "₡" + total_atendido.toLocaleString('es-CR');
+    document.getElementById("v_total").textContent = cant_total;
+    document.getElementById("v_atendidas").textContent = cant_atendidas;
+    document.getElementById("v_total_cobrado").textContent = "₡" + total_atendido.toLocaleString('es-CR');
+    
+    // Estos los podés dejar fijos o calcularlos igual
+    document.getElementById("v_activas").textContent = citasFiltradas.filter(c => !["CITA CANCELADA", "CITA ATENDIDA"].includes(c.servicio)).length;
 }
 
 function renderCitas(citas){
