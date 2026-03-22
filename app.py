@@ -312,77 +312,53 @@ def index():
 
 @app.route("/horas")
 def horas():
-    fecha_str = request.args.get('fecha')
-    barbero = request.args.get('barbero')
+    fecha_str = request.args.get('fecha') # Viene como "2026-03-21"
+    barbero_actual = os.getenv("NOMBRE_BARBERO", "Junior")
     if not fecha_str: return jsonify([])
 
-    # 1. Determinar el día de la semana
+    # 1. Configurar el horario del barbero
     try:
-        fecha_dt = datetime.strptime(fecha_str, "%Y-%m-%d")
-    except:
-        return jsonify([])
-        
-    dia_semana = fecha_dt.weekday() 
+        f_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
+    except: return jsonify([])
+    
+    dia_semana = f_obj.weekday()
+    if dia_semana == 6: h_inicio, h_fin = 9, 16 # Domingo
+    elif dia_semana in [4, 5]: h_inicio, h_fin = 8, 20 # Viernes/Sábado
+    else: h_inicio, h_fin = 9, 20 # Lunes-Jueves
 
-    # 2. Configurar apertura y cierre (Horario de Junior)
-    if dia_semana == 6: h_inicio, h_fin = 9, 16
-    elif dia_semana in [4, 5]: h_inicio, h_fin = 8, 20
-    else: h_inicio, h_fin = 9, 20
-
-    # 3. Generar lista de horas base
+    # 2. Generar lista de horas posibles (cada 30 min)
     horas_base = []
-    actual = datetime.combine(fecha_dt.date(), datetime.min.time()).replace(hour=h_inicio)
-    fin_jornada = datetime.combine(fecha_dt.date(), datetime.min.time()).replace(hour=h_fin)
+    actual = datetime.combine(f_obj.date(), datetime.min.time()).replace(hour=h_inicio)
+    fin_jornada = datetime.combine(f_obj.date(), datetime.min.time()).replace(hour=h_fin)
 
     while actual < fin_jornada:
-        if actual + timedelta(minutes=30) <= fin_jornada:
-            horas_base.append(actual.strftime("%I:%M %p"))
+        horas_base.append(actual.strftime("%I:%M %p").lower()) # "09:00 am"
         actual += timedelta(minutes=30)
 
-    # 4. Lógica de bloqueo de citas ocupadas
-    barbero_norm = normalizar_barbero(barbero)
-    citas = leer_citas()
-    minutos_bloqueados = []
+    # 3. LEER CITAS Y BLOQUEAR (Aquí está el arreglo)
+    citas = leer_citas_db() # Esta función ya trae las fechas bonitas
+    bloqueadas = []
+    
+    # Formateamos la fecha seleccionada para que coincida con el texto de la DB
+    # Buscamos el pedacito "21/03/2026" dentro del texto "Sábado 21/03/2026"
+    fecha_buscar = f_obj.strftime("%d/%m/%Y")
 
     for c in citas:
-        if normalizar_barbero(c.get("barbero", "")) == barbero_norm and \
-           str(c.get("fecha")) == fecha_str and \
-           c.get("servicio") not in ["CITA CANCELADA", "CITA ATENDIDA"]:
+        # Solo bloqueamos si: misma fecha, mismo barbero y NO está cancelada
+        if fecha_buscar in str(c.get("fecha")) and c.get("servicio") != "CITA CANCELADA":
+            hora_cita = str(c.get("hora")).lower().strip() # "09:00 am"
+            bloqueadas.append(hora_cita)
             
-            h_db_dt = _hora_ampm_a_time(c.get("hora"))
-            if h_db_dt:
-                min_inicio = h_db_dt.hour * 60 + h_db_dt.minute
-                dur = int(c.get("duracion", 30))
-                for offset in range(0, dur, 30):
-                    minutos_bloqueados.append(min_inicio + offset)
+            # Si la cita dura más de 30 min, bloqueamos el siguiente bloque también
+            duracion = int(c.get("duracion", 30))
+            if duracion > 30:
+                h_dt = datetime.strptime(hora_cita, "%I:%M %p")
+                proxima = (h_dt + timedelta(minutes=30)).strftime("%I:%M %p").lower()
+                bloqueadas.append(proxima)
 
-    # 5. Filtrar las horas disponibles (que no estén bloqueadas)
-    disponibles = []
-    for h in horas_base:
-        h_lista_dt = _hora_ampm_a_time(h)
-        if h_lista_dt:
-            min_actual = h_lista_dt.hour * 60 + h_lista_dt.minute
-            if min_actual not in minutos_bloqueados:
-                disponibles.append(h)
+    # 4. Filtrar las que no están bloqueadas
+    disponibles = [h.upper() for h in horas_base if h not in bloqueadas]
     
-    # 6. MARGEN DE SEGURIDAD (EL COLCHÓN DE 30 MINUTOS)
-    MARGEN_SEGURIDAD = 30
-    ahora_cr = _now_cr()
-    
-    if str(fecha_str) == ahora_cr.strftime("%Y-%m-%d"):
-        # Minutos actuales en CR + el colchón
-        tiempo_limite = (ahora_cr.hour * 60 + ahora_cr.minute) + MARGEN_SEGURIDAD
-        
-        nuevas_disponibles = []
-        for h in disponibles:
-            h_dt = _hora_ampm_a_time(h)
-            if h_dt:
-                min_cita = h_dt.hour * 60 + h_dt.minute
-                # Solo dejamos pasar las citas que están fuera del margen
-                if min_cita > tiempo_limite:
-                    nuevas_disponibles.append(h)
-        disponibles = nuevas_disponibles
-        
     return jsonify(disponibles)
 
 @app.route("/cancelar", methods=["POST"])
