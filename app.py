@@ -190,6 +190,11 @@ def guardar_cita_db(id_cita, cliente, cliente_id, barbero, servicio, precio, fec
     }
     res = _supabase_request("POST", url, json_body=body, extra_headers={"Prefer": "return=minimal"})
     return res is not None
+    body = {
+    "id": str(id_cita),  # Esto asegura que mandamos el UUID largo
+    "cliente": cliente,
+    # ... los demás campos igual
+}
 
 def leer_citas():
     if USAR_SUPABASE:
