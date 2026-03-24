@@ -174,9 +174,20 @@ def leer_citas_db():
         })
     return citas_procesadas
 
-def guardar_cita_db(cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion):
+def guardar_cita_db(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion):
     url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/citas"
-    body = {"cliente": cliente, "cliente_id": str(cliente_id), "barbero": barbero, "servicio": servicio, "precio": int(precio), "fecha": fecha, "hora": hora, "duracion": int(duracion)}
+    # IMPORTANTE: Ahora incluimos el ID que generamos para que coincida con el TXT
+    body = {
+        "id": id_cita, 
+        "cliente": cliente, 
+        "cliente_id": str(cliente_id), 
+        "barbero": barbero, 
+        "servicio": servicio, 
+        "precio": int(precio), 
+        "fecha": fecha, 
+        "hora": hora, 
+        "duracion": int(duracion)
+    }
     res = _supabase_request("POST", url, json_body=body, extra_headers={"Prefer": "return=minimal"})
     return res is not None
 
@@ -189,11 +200,15 @@ def leer_citas():
 def guardar_cita(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion):
     if USAR_SUPABASE:
         try:
-            if not guardar_cita_db(cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion):
-                guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion)
-        except: guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion)
-    else: guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion)
-
+            # Si se guarda en la nube, no tocamos el archivo de texto
+            if guardar_cita_db(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion):
+                print(f"✅ Cita de {cliente} guardada en Supabase")
+                return 
+        except Exception as e:
+            print(f"⚠️ Error en Supabase, respaldando en TXT: {e}")
+    
+    # Solo si la nube falla, usamos el TXT como respaldo
+    guardar_cita_txt(id_cita, cliente, cliente_id, barbero, servicio, precio, fecha, hora, duracion)
 def _reescribir_citas_txt_actualizando_servicio(id_cita, nuevo_servicio):
     citas = leer_citas_txt()
     with open("citas.txt", "w", encoding="utf-8") as f:
